@@ -1,0 +1,34 @@
+# ---------------------------------------------------------------------------
+# Datei:        .gitignore
+# Projekt:      RIMPERIO-App
+# Autor:        Phydran6
+# Beschreibung: Flutter/Dart-Baureste und erzeugte Plattform-Artefakte.
+# ---------------------------------------------------------------------------
+
+# Flutter/Dart/Pub
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Erzeugte Plattform-Ordner (via `flutter create .` lokal erzeugen)
+# Hinweis: Wer die Plattform-Ordner einchecken will, entfernt diese Zeilen.
+/android/
+/ios/
+/linux/
+/macos/
+/windows/
+/web/

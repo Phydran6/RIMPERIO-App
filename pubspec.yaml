@@ -1,0 +1,28 @@
+# ---------------------------------------------------------------------------
+# Datei:        pubspec.yaml
+# Projekt:      RIMPERIO-App
+# Autor:        Phydran6
+# Version:      2026.11.05.12.00.00
+# Beschreibung: Flutter-App — WebView auf den eigenen RIMPERIO-Server.
+# ---------------------------------------------------------------------------
+name: rimperio_app
+description: "RIMPERIO — Remote Monitoring & Management vom Handy."
+publish_to: "none"
+version: 2026.11.5+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  webview_flutter: ^4.8.0
+  flutter_secure_storage: ^9.2.2
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
