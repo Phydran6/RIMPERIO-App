@@ -2,13 +2,13 @@
 # Datei:        pubspec.yaml
 # Projekt:      RIMPERIO-App
 # Autor:        Phydran6
-# Version:      2026.11.05.12.00.00
+# Version:      2026.11.06.23.30.00
 # Beschreibung: Flutter-App — WebView auf den eigenen RIMPERIO-Server.
 # ---------------------------------------------------------------------------
 name: rimperio_app
 description: "RIMPERIO — Remote Monitoring & Management vom Handy."
 publish_to: "none"
-version: 2026.11.5+1
+version: 2026.11.6+2
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -22,7 +22,29 @@ dependencies:
   cupertino_icons: ^1.0.8
 
 dev_dependencies:
+  flutter_test:
+    sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
+  assets:
+    # Nur das kleine Logo für die Einrichtungsseite — die großen Icon-Vorlagen
+    # landen über flutter_launcher_icons in android/ und ios/, nicht im Bundle.
+    - assets/icon/rimperio_logo.png
+
+# App-Symbol für Android und iOS. Erzeugen mit:
+#   dart run flutter_launcher_icons
+# (macht scripts/setup_platforms.sh automatisch)
+flutter_launcher_icons:
+  image_path: "assets/icon/icon.png"
+  android: true
+  min_sdk_android: 21
+  # Android 8+: Logo in der Sicherheitszone, Rand läuft in den Grundton aus —
+  # so bleibt die Wortmarke in jeder Launcher-Maske (Kreis, Squircle …) ganz.
+  adaptive_icon_background: "#030B1A"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+  ios: true
+  remove_alpha_ios: true
+  background_color_ios: "#030B1A"

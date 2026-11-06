@@ -2,13 +2,15 @@
 // Datei:        lib/webview_page.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.05.12.00.00
+// Version:      2026.11.06.23.30.00
 //
 // Beschreibung: Die eigentliche App: eine WebView auf die RIMPERIO-Oberfläche.
-//               Zurück-Taste blättert in der Seite; über das Menü lässt sich
+//               Zurück-Taste blättert in der Seite (am Anfang schließt sie die
+//               App); über das Menü lässt sich
 //               neu laden oder der Server wechseln.
 // ---------------------------------------------------------------------------
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import 'storage.dart';
@@ -35,14 +37,19 @@ class _WebViewPageState extends State<WebViewPage> {
       ..setBackgroundColor(const Color(0xFF0A1222))
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (_) => setState(() {
-            _loading = true;
-            _error = null;
-          }),
-          onPageFinished: (_) => setState(() => _loading = false),
+          onPageStarted: (_) {
+            if (!mounted) return;
+            setState(() {
+              _loading = true;
+              _error = null;
+            });
+          },
+          onPageFinished: (_) {
+            if (mounted) setState(() => _loading = false);
+          },
           onWebResourceError: (err) {
             // Nur echte Seitenfehler zeigen, nicht jede Teilressource.
-            if (err.isForMainFrame ?? true) {
+            if (mounted && (err.isForMainFrame ?? true)) {
               setState(() => _error = err.description);
             }
           },
@@ -60,10 +67,13 @@ class _WebViewPageState extends State<WebViewPage> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) async {
+      onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
         if (await _controller.canGoBack()) {
-          _controller.goBack();
+          await _controller.goBack();
+        } else {
+          // Am Anfang der Seitenhistorie: App wie gewohnt schließen.
+          await SystemNavigator.pop();
         }
       },
       child: Scaffold(

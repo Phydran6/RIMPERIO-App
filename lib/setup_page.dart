@@ -2,7 +2,7 @@
 // Datei:        lib/setup_page.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.05.12.00.00
+// Version:      2026.11.06.23.30.00
 //
 // Beschreibung: Einrichtung — die Adresse des eigenen RIMPERIO-Servers eingeben.
 //               Fehlt das Schema, wird https:// vorangestellt.
@@ -42,7 +42,7 @@ class _SetupPageState extends State<SetupPage> {
       return;
     }
     final uri = Uri.tryParse(url);
-    if (uri == null || !uri.hasAuthority) {
+    if (uri == null || uri.host.isEmpty) {
       setState(() => _error = 'Die Adresse sieht nicht gültig aus.');
       return;
     }
@@ -69,12 +69,17 @@ class _SetupPageState extends State<SetupPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.hub_outlined, size: 56, color: Color(0xFFD4AF37)),
+                  // Das Logo trägt die Wortmarke selbst — kein extra Titel.
+                  Center(
+                    child: Image.asset(
+                      'assets/icon/rimperio_logo.png',
+                      width: 168,
+                      height: 168,
+                      filterQuality: FilterQuality.medium,
+                      semanticLabel: 'RIMPERIO',
+                    ),
+                  ),
                   const SizedBox(height: 16),
-                  const Text('RIMPERIO',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, letterSpacing: 2)),
-                  const SizedBox(height: 8),
                   const Text('Mit deinem Server verbinden',
                       textAlign: TextAlign.center, style: TextStyle(color: Colors.white70)),
                   const SizedBox(height: 28),
