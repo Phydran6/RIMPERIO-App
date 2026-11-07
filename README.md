@@ -6,8 +6,8 @@
 
 **Die eigene RIMPERIO-Instanz am Handy**
 
-Eine schlanke **Flutter**-App, die als gehärtete WebView auf deinen
-[RIMPERIO-Server](https://github.com/Phydran6/RIMPERIO-Server) zeigt.
+Eine native **Flutter**-App für deinen
+[RIMPERIO-Server](https://github.com/Phydran6/RIMPERIO-Server).
 Eine Codebasis für **Android und iOS**.
 
 [![CI](https://github.com/Phydran6/RIMPERIO-App/actions/workflows/ci.yml/badge.svg)](https://github.com/Phydran6/RIMPERIO-App/actions/workflows/ci.yml)
@@ -23,16 +23,24 @@ Eine Codebasis für **Android und iOS**.
 
 ## Prinzip
 
-Wie bei der LogBot-App: Die App reicht die volle Weboberfläche durch und merkt
-sich nur **wohin** sie zeigt. Die Anmeldung (Sitzungs-Token) bleibt in der WebView
-— die App speichert nur die Server-Adresse, verschlüsselt über
-`flutter_secure_storage`.
+Eine **native** App auf die schlanke App-Schnittstelle des Servers (`/api/app/*`) —
+keine WebView. Untere Navigationsleiste mit **Übersicht, Logs, Geräte, Meldungen, Mehr**;
+dazu Updates/Freigaben (inkl. KI-Einschätzung, Zurückrollen) und SNMP.
 
 | | |
 |---|---|
-| **Technik** | Flutter / Dart, `webview_flutter`, `flutter_secure_storage` |
-| **Plattformen** | Android &amp; iOS |
-| **Was gespeichert wird** | nur die Server-Adresse (verschlüsselt) |
+| **Anmeldung** | QR-Code aus der Weboberfläche (*Benutzer → App verbinden*) oder Benutzer/Passwort, mit Zweitfaktor |
+| **Biometrie** | Fingerabdruck / Face ID entsperrt die App; nach Passwort-Anmeldung meldet sie nach Ablauf der 24-h-Sitzung still neu an |
+| **Verbindung** | immer zuerst HTTPS; `http://` nur nach Warnung, danach dauerhaft rot markiert |
+| **Benachrichtigungen** | Berechtigung wird nach der Anmeldung erfragt; Abfrage im Vordergrund jede Minute, im Hintergrund (Android) etwa alle 15 min |
+| **Gespeichert (verschlüsselt)** | Server-Adresse, Sitzungs-Token; das Passwort nur bei eingeschalteter Biometrie |
+| **Technik** | Flutter / Dart, `http`, `flutter_secure_storage`, `local_auth`, `mobile_scanner`, `flutter_local_notifications`, `workmanager` |
+
+> **QR-Code zeigt `http://`?** Dann ist am Server keine `SITE_URL` gesetzt. Die App
+> probiert trotzdem zuerst HTTPS. Dauerhaft beheben: `SITE_URL=https://…` am Server setzen.
+
+> **Benachrichtigungen:** Der Server hat (noch) keinen Push-Dienst. Die App fragt deshalb
+> selbst nach. Unter iOS geht das nur, solange die App offen ist.
 
 ---
 
@@ -52,7 +60,8 @@ Installieren gedacht, nicht für den Play Store.
 
 Dieses Repo enthält die Quelle (`lib/`, `pubspec.yaml`, `assets/`). Die
 plattform-spezifischen Ordner (`android/`, `ios/`) erzeugt ein Skript, das sie
-auch gleich fertig einrichtet — App-Name **RIMPERIO**, Internet-Berechtigung im
+auch gleich fertig einrichtet — App-Name **RIMPERIO**, Berechtigungen (Internet,
+Kamera, Benachrichtigungen, Biometrie), FragmentActivity, Desugaring, iOS-Texte im
 Release, App-Symbol:
 
 ```bash
@@ -92,22 +101,26 @@ Neues Logo? Die drei Dateien ersetzen und `dart run flutter_launcher_icons` ausf
 
 | Datei | Wofür |
 |---|---|
-| [`lib/main.dart`](lib/main.dart) | Einstieg: Server vorhanden → WebView, sonst Einrichtung |
-| [`lib/setup_page.dart`](lib/setup_page.dart) | Server-Adresse eingeben und speichern |
-| [`lib/webview_page.dart`](lib/webview_page.dart) | die WebView samt Zurück-Navigation und „Server ändern" |
-| [`lib/storage.dart`](lib/storage.dart) | verschlüsselte Ablage der Adresse |
+| [`lib/main.dart`](lib/main.dart) | Einstieg: Einrichtung → Anmeldung → Sperre → App |
+| [`lib/core/session.dart`](lib/core/session.dart) | Sitzungszustand, Token-Ablauf, Biometrie-Neuanmeldung |
+| [`lib/core/api.dart`](lib/core/api.dart) | Client für `/api/auth/*` und `/api/app/*` |
+| [`lib/core/server_address.dart`](lib/core/server_address.dart) | Adresse aufbereiten, HTTPS als Vorgabe |
+| [`lib/core/qr_login.dart`](lib/core/qr_login.dart) | Inhalt des Anmelde-QR-Codes |
+| [`lib/core/biometrics.dart`](lib/core/biometrics.dart) | Fingerabdruck / Face ID |
+| [`lib/core/notifications.dart`](lib/core/notifications.dart) | Berechtigung, Abfrage, System-Benachrichtigungen |
+| [`lib/core/storage.dart`](lib/core/storage.dart) | verschlüsselte Ablage |
+| [`lib/screens/`](lib/screens/) | Einrichtung, QR-Scan, Anmeldung, Sperre, Übersicht, Logs, Geräte, Meldungen, Updates, SNMP, Mehr |
+| [`lib/ui/`](lib/ui/) | Farben, gemeinsame Bausteine |
 | [`scripts/setup_platforms.sh`](scripts/setup_platforms.sh) | erzeugt und konfiguriert `android/` und `ios/` |
-| [`test/widget_test.dart`](test/widget_test.dart) | Tests der Einrichtungsseite |
+| [`test/widget_test.dart`](test/widget_test.dart) | Tests: Adressen, QR-Code, Token-Ablauf, Einrichtung |
 | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | CI: Analyse, Tests, APK, iOS-Build, Release bei Tag |
 
 ---
 
 ## Mögliche Erweiterungen
 
-- **App-Sperre per Biometrie** (`local_auth`) wie bei der LogBot-App — dafür muss
-  `MainActivity` von `FlutterFragmentActivity` erben.
-- **QR-Code-Einrichtung**: Server-Adresse (und optional ein Token) per QR aus der
-  Weboberfläche scannen.
+- **Echter Push** (FCM/APNs) — braucht einen Push-Versand am Server.
+- **Refresh-Token** am Server, damit auch QR- und MFA-Anmeldungen nach 24 h ohne neue Anmeldung weiterlaufen.
 
 ---
 
