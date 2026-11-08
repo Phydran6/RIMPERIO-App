@@ -2,11 +2,13 @@
 # Datei:        .github/workflows/ci.yml
 # Projekt:      RIMPERIO-App
 # Autor:        Phydran6
-# Version:      2026.11.06.23.30.00
+# Version:      2026.11.08.12.00.00
 # Beschreibung: Bei jedem Push/PR: Plattform-Ordner erzeugen, analysieren,
 #               testen, Android-APK und iOS (unsigniert) bauen. Die APK hängt
-#               30 Tage als Artefakt am Lauf. Bei einem Tag v* wird daraus
-#               ein GitHub-Release mit der APK.
+#               30 Tage als Artefakt am Lauf. Ein GitHub-Release mit der APK
+#               entsteht bei einem Tag v* und automatisch bei einem Push auf
+#               main, wenn es für die Version aus pubspec.yaml noch keinen
+#               Tag v<Version> gibt (Tag und Release legt die CI dann an).
 # ---------------------------------------------------------------------------
 name: CI
 
@@ -89,19 +91,42 @@ jobs:
 
   release:
     name: GitHub-Release
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
     needs: [android]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag bestimmen
+        id: tag
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            v=$(grep -E '^version:' pubspec.yaml | awk '{print $2}' | cut -d+ -f1)
+            tag="v${v}"
+            if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null; then
+              echo "Tag ${tag} gibt es schon – kein neues Release."
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
       - uses: actions/download-artifact@v4
+        if: steps.tag.outputs.skip != 'true'
         with:
           name: android-apk
           path: dist
 
       - uses: softprops/action-gh-release@v2
+        if: steps.tag.outputs.skip != 'true'
         with:
-          name: RIMPERIO-App ${{ github.ref_name }}
+          tag_name: ${{ steps.tag.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: RIMPERIO-App ${{ steps.tag.outputs.tag }}
           files: dist/*.apk
           generate_release_notes: true
