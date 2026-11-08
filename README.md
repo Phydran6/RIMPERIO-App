@@ -47,7 +47,8 @@ dazu Updates/Freigaben (inkl. KI-Einschätzung, Zurückrollen) und SNMP.
 ## Herunterladen
 
 - **Release:** die APK hängt am [neuesten Release](https://github.com/Phydran6/RIMPERIO-App/releases/latest)
-  (entsteht automatisch, sobald ein Tag `v…` gepusht wird).
+  (entsteht automatisch, sobald auf `main` eine neue `version:` in `pubspec.yaml`
+  steht, oder wenn ein Tag `v…` gepusht wird).
 - **Jeder Stand:** jeder [CI-Lauf](https://github.com/Phydran6/RIMPERIO-App/actions/workflows/ci.yml)
   hat 30 Tage lang die APK als Artefakt `android-apk` (Anmeldung bei GitHub nötig).
 
@@ -113,7 +114,7 @@ Neues Logo? Die drei Dateien ersetzen und `dart run flutter_launcher_icons` ausf
 | [`lib/ui/`](lib/ui/) | Farben, gemeinsame Bausteine |
 | [`scripts/setup_platforms.sh`](scripts/setup_platforms.sh) | erzeugt und konfiguriert `android/` und `ios/` |
 | [`test/widget_test.dart`](test/widget_test.dart) | Tests: Adressen, QR-Code, Token-Ablauf, Einrichtung |
-| [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | CI: Analyse, Tests, APK, iOS-Build, Release bei Tag |
+| [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | CI: Analyse, Tests, APK, iOS-Build, Release bei neuer Version auf `main` oder Tag |
 
 ---
 
