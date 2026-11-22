@@ -46,9 +46,18 @@ dazu Updates/Freigaben (inkl. KI-Einschätzung, Zurückrollen) und SNMP.
 
 ## Herunterladen
 
-- **Release:** die APK hängt am [neuesten Release](https://github.com/Phydran6/RIMPERIO-App/releases/latest)
-  (entsteht automatisch, sobald auf `main` eine neue `version:` in `pubspec.yaml`
-  steht, oder wenn ein Tag `v…` gepusht wird).
+- **Release:** APK und AAB hängen am [neuesten Release](https://github.com/Phydran6/RIMPERIO-App/releases/latest).
+  Releases entstehen **vollautomatisch**: Bei jedem Push auf `main`, der etwas an der
+  App ändert (`lib/`, `assets/`, `pubspec.yaml`, `scripts/setup_platforms.sh`),
+  vergibt die CI Version und Versionscode selbst und legt das Release an. Reine
+  Doku-/CI-Änderungen lösen keins aus; *Actions → CI → Run workflow* erzwingt eins.
+
+  | | Herkunft | Beispiel |
+  |---|---|---|
+  | Versionsname | Datum (Europe/Berlin), am selben Tag mit `.2`, `.3` … | `2026.11.23` |
+  | Versionscode | 100 + fortlaufende CI-Laufnummer — steigt immer | `142` |
+
+  Die `version:` in `pubspec.yaml` gilt nur noch für lokale Builds.
 - **Jeder Stand:** jeder [CI-Lauf](https://github.com/Phydran6/RIMPERIO-App/actions/workflows/ci.yml)
   hat 30 Tage lang die APK als Artefakt `android-apk` (Anmeldung bei GitHub nötig).
 
@@ -124,8 +133,16 @@ GitHub-Release enthält neben der APK auch die `.aab`.
 hochladen.
 
 > **Versionscode:** Jede hochgeladene AAB braucht einen höheren Versionscode —
-> das ist die Zahl hinter dem `+` in `pubspec.yaml` (`version: 2026.11.22+4`).
-> Vor jedem Upload hochzählen.
+> den vergibt die CI automatisch (siehe [Herunterladen](#herunterladen)).
+> Einfach die `.aab` aus dem neuesten Release nehmen.
+
+> **„Mit dem falschen Schlüssel signiert“?** Dann kennt die Play Console einen
+> anderen Upload-Schlüssel. Der Fingerabdruck der CI-AAB steht im Protokoll des
+> Schritts *Play-Store-Bundle (AAB) bauen*. Entweder den passenden Schlüssel in
+> die Secrets legen oder in der Play Console unter *Einstellungen →
+> App-Integrität → Upload-Schlüssel zurücksetzen* das neue Zertifikat
+> (`keytool -export -rfc -alias upload -keystore upload-keystore.jks -file upload_certificate.pem`)
+> hochladen.
 
 > **Paketname:** `de.phytech.rimperio_app` — lässt sich nach dem ersten Upload
 > nicht mehr ändern.

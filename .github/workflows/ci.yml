@@ -2,22 +2,29 @@
 # Datei:        .github/workflows/ci.yml
 # Projekt:      RIMPERIO-App
 # Autor:        Phydran6
-# Version:      2026.11.22.12.00.00
+# Version:      2026.11.22.13.00.00
 # Beschreibung: Bei jedem Push/PR: Plattform-Ordner erzeugen, analysieren,
-#               testen, Android-APK und iOS (unsigniert) bauen. Die APK hängt
-#               30 Tage als Artefakt am Lauf, mit Signatur-Secrets auch die
-#               AAB für den Play Store (Artefakt android-aab).
-#               Ein GitHub-Release mit APK (und AAB) entsteht bei einem Tag v* und
-#               automatisch bei einem Push auf main, wenn es für die Version
-#               aus pubspec.yaml noch keinen Tag v<Version> gibt (Tag und
-#               Release legt die CI dann an).
+#               testen, Android-APK, Play-Store-Bundle (AAB, nur mit
+#               Signatur-Secrets) und iOS (unsigniert) bauen.
+#
+#               Versionen vergibt die CI selbst — in pubspec.yaml muss
+#               nichts geändert werden:
+#                 Name  = Datum (Europe/Berlin), z. B. 2026.11.23;
+#                         gibt es den Tag schon: 2026.11.23.2, .3, …
+#                 Code  = 100 + fortlaufende Laufnummer (steigt immer —
+#                         das verlangt der Play Store)
+#
+#               Release (Tag v<Name>, APK + AAB) entsteht automatisch bei
+#               einem Push auf main, wenn sich seit dem letzten Release an
+#               der App etwas geändert hat (lib/, assets/, pubspec.yaml,
+#               scripts/setup_platforms.sh). Reine Doku-/CI-Änderungen
+#               lösen keins aus. "Run workflow" auf main erzwingt eins.
 # ---------------------------------------------------------------------------
 name: CI
 
 on:
   push:
     branches: ['**']
-    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -29,10 +36,67 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  version:
+    name: Version und Änderungen erkennen
+    runs-on: ubuntu-latest
+    outputs:
+      name: ${{ steps.v.outputs.name }}
+      code: ${{ steps.v.outputs.code }}
+      release: ${{ steps.v.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # ganze Historie + Tags für den Vergleich
+
+      - name: Version bestimmen
+        id: v
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+        run: |
+          code=$((100 + RUN_NUMBER))
+          base=$(TZ=Europe/Berlin date +%Y.%-m.%-d)
+          name="$base"; n=1
+          while git rev-parse -q --verify "refs/tags/v${name}" >/dev/null; do
+            n=$((n + 1)); name="${base}.${n}"
+          done
+
+          release=false
+          if [ "$REF" = "refs/heads/main" ]; then
+            last=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
+            if [ "$EVENT" = "workflow_dispatch" ]; then
+              echo "Von Hand gestartet → Release."
+              release=true
+            elif [ "$EVENT" = "push" ]; then
+              if [ -z "$last" ]; then
+                echo "Noch kein Release → Release."
+                release=true
+              elif git diff --quiet "$last" HEAD -- lib assets pubspec.yaml scripts/setup_platforms.sh; then
+                echo "Keine App-Änderung seit $last → kein Release."
+              else
+                echo "App geändert seit $last:"
+                git diff --stat "$last" HEAD -- lib assets pubspec.yaml scripts/setup_platforms.sh
+                release=true
+              fi
+            fi
+          fi
+
+          echo "Version $name (Code $code), Release: $release"
+          {
+            echo "name=$name"
+            echo "code=$code"
+            echo "release=$release"
+          } >> "$GITHUB_OUTPUT"
+
   android:
-    name: Android — analysieren, testen, APK
+    name: Android — analysieren, testen, APK, AAB
+    needs: [version]
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    env:
+      BUILD_NAME: ${{ needs.version.outputs.name }}
+      BUILD_NUMBER: ${{ needs.version.outputs.code }}
     steps:
       - uses: actions/checkout@v4
 
@@ -56,21 +120,15 @@ jobs:
         run: flutter test
 
       - name: Release-APK bauen
-        run: flutter build apk --release
-
-      - name: APK benennen
-        id: apk
         run: |
-          v=$(grep -E '^version:' pubspec.yaml | awk '{print $2}' | cut -d+ -f1)
-          name="RIMPERIO-${v}.apk"
-          cp build/app/outputs/flutter-apk/app-release.apk "$name"
-          ls -lh "$name"
-          echo "name=$name" >> "$GITHUB_OUTPUT"
+          flutter build apk --release --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
+          cp build/app/outputs/flutter-apk/app-release.apk "RIMPERIO-${BUILD_NAME}.apk"
+          ls -lh RIMPERIO-*.apk
 
       - uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: ${{ steps.apk.outputs.name }}
+          path: RIMPERIO-*.apk
           retention-days: 30
 
       # Play Store: nur mit hinterlegtem Upload-Schlüssel (Secrets, siehe
@@ -100,20 +158,19 @@ jobs:
 
       - name: Play-Store-Bundle (AAB) bauen
         if: steps.key.outputs.signed == 'true'
-        id: aab
         run: |
-          flutter build appbundle --release
-          v=$(grep -E '^version:' pubspec.yaml | awk '{print $2}' | tr '+' '-')
-          name="RIMPERIO-${v}.aab"
-          cp build/app/outputs/bundle/release/app-release.aab "$name"
-          ls -lh "$name"
-          echo "name=$name" >> "$GITHUB_OUTPUT"
+          flutter build appbundle --release --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
+          cp build/app/outputs/bundle/release/app-release.aab "RIMPERIO-${BUILD_NAME}-${BUILD_NUMBER}.aab"
+          ls -lh RIMPERIO-*.aab
+          # Fingerabdruck ins Protokoll — muss zum Upload-Schlüssel in der
+          # Play Console passen (Einstellungen → App-Integrität).
+          keytool -printcert -jarfile RIMPERIO-*.aab | grep -E 'SHA1|SHA256'
 
       - uses: actions/upload-artifact@v4
         if: steps.key.outputs.signed == 'true'
         with:
           name: android-aab
-          path: ${{ steps.aab.outputs.name }}
+          path: RIMPERIO-*.aab
           retention-days: 30
 
       - name: Schlüssel entfernen
@@ -122,6 +179,7 @@ jobs:
 
   ios:
     name: iOS — bauen (ohne Signatur)
+    needs: [version]
     runs-on: macos-latest
     timeout-minutes: 40
     steps:
@@ -136,48 +194,35 @@ jobs:
         run: bash scripts/setup_platforms.sh
 
       - name: iOS bauen
-        run: flutter build ios --release --no-codesign
+        run: >-
+          flutter build ios --release --no-codesign
+          --build-name "${{ needs.version.outputs.name }}"
+          --build-number "${{ needs.version.outputs.code }}"
 
   release:
     name: GitHub-Release
-    if: >-
-      startsWith(github.ref, 'refs/tags/v') ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    needs: [android]
+    if: needs.version.outputs.release == 'true'
+    needs: [version, android]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Tag bestimmen
-        id: tag
-        run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            tag="$GITHUB_REF_NAME"
-          else
-            v=$(grep -E '^version:' pubspec.yaml | awk '{print $2}' | cut -d+ -f1)
-            tag="v${v}"
-            if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null; then
-              echo "Tag ${tag} gibt es schon – kein neues Release."
-              echo "skip=true" >> "$GITHUB_OUTPUT"
-            fi
-          fi
-          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
-
       - uses: actions/download-artifact@v4
-        if: steps.tag.outputs.skip != 'true'
         with:
           pattern: android-*
           merge-multiple: true
           path: dist
 
       - uses: softprops/action-gh-release@v2
-        if: steps.tag.outputs.skip != 'true'
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
+          tag_name: v${{ needs.version.outputs.name }}
           target_commitish: ${{ github.sha }}
-          name: RIMPERIO-App ${{ steps.tag.outputs.tag }}
+          name: RIMPERIO-App v${{ needs.version.outputs.name }}
+          body: |
+            Version **${{ needs.version.outputs.name }}** · Versionscode **${{ needs.version.outputs.code }}**
+
+            - `RIMPERIO-${{ needs.version.outputs.name }}.apk` — direkt aufs Handy installieren
+            - `RIMPERIO-${{ needs.version.outputs.name }}-${{ needs.version.outputs.code }}.aab` — für die Google Play Console
           files: |
             dist/*.apk
             dist/*.aab
