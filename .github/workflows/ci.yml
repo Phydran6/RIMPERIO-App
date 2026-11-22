@@ -2,22 +2,15 @@
 # Datei:        .github/workflows/ci.yml
 # Projekt:      RIMPERIO-App
 # Autor:        Phydran6
-<<<<<<< HEAD
-# Version:      2026.11.08.12.00.00
-# Beschreibung: Bei jedem Push/PR: Plattform-Ordner erzeugen, analysieren,
-#               testen, Android-APK und iOS (unsigniert) bauen. Die APK hängt
-#               30 Tage als Artefakt am Lauf. Ein GitHub-Release mit der APK
-#               entsteht bei einem Tag v* und automatisch bei einem Push auf
-#               main, wenn es für die Version aus pubspec.yaml noch keinen
-#               Tag v<Version> gibt (Tag und Release legt die CI dann an).
-=======
 # Version:      2026.11.22.12.00.00
 # Beschreibung: Bei jedem Push/PR: Plattform-Ordner erzeugen, analysieren,
 #               testen, Android-APK und iOS (unsigniert) bauen. Die APK hängt
 #               30 Tage als Artefakt am Lauf, mit Signatur-Secrets auch die
-#               AAB für den Play Store. Bei einem Tag v* wird daraus
-#               ein GitHub-Release mit der APK.
->>>>>>> 9419d93 (RIMPERIO-App: Play-Store-Bundle (AAB) mit Upload-Schlüssel)
+#               AAB für den Play Store (Artefakt android-aab).
+#               Ein GitHub-Release mit der APK entsteht bei einem Tag v* und
+#               automatisch bei einem Push auf main, wenn es für die Version
+#               aus pubspec.yaml noch keinen Tag v<Version> gibt (Tag und
+#               Release legt die CI dann an).
 # ---------------------------------------------------------------------------
 name: CI
 
