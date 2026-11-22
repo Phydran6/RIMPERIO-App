@@ -59,11 +59,12 @@ dazu Updates/Freigaben (inkl. KI-Einschätzung, Zurückrollen) und SNMP.
 
   Die `version:` in `pubspec.yaml` gilt nur noch für lokale Builds.
 - **Jeder Stand:** jeder [CI-Lauf](https://github.com/Phydran6/RIMPERIO-App/actions/workflows/ci.yml)
-  hat 30 Tage lang die APK als Artefakt `android-apk` (Anmeldung bei GitHub nötig).
+  hat 30 Tage lang die Artefakte `android-apk` und `android-aab` (Anmeldung bei GitHub nötig).
 
-Die APK ist mit dem Debug-Schlüssel von Flutter signiert — zum direkten
-Installieren gedacht, nicht für den Play Store. Für den Play Store siehe
-[Google Play Store](#google-play-store).
+| Datei | Signiert mit | Wofür |
+|---|---|---|
+| `RIMPERIO-<Version>.apk` | Debug-Schlüssel von Flutter | direkt aufs Handy installieren |
+| `RIMPERIO-<Version>-<Code>.aab` | Upload-Schlüssel | [Google Play Store](#google-play-store) |
 
 ---
 
@@ -93,59 +94,22 @@ flutter build apk      # Release-APK
 
 ## Google Play Store
 
-Der Play Store will ein **Android App Bundle (`.aab`)**, signiert mit deinem
-eigenen **Upload-Schlüssel** (Google signiert die App danach selbst neu —
-*Play App Signing*).
+Die App ist als **`de.phytech.rimperio_app`** in der Play Console angelegt.
+Ein Update ist ein Handgriff: `.aab` aus dem
+[neuesten Release](https://github.com/Phydran6/RIMPERIO-App/releases/latest)
+nehmen und in der Play Console hochladen. Version, Versionscode und Signatur
+erledigt die CI.
 
-**1. Upload-Schlüssel anlegen** (einmalig):
-
-```bash
-bash scripts/create_upload_key.sh
-```
-
-Das legt `upload-keystore.jks` und `key.properties` im Repo-Ordner an (beide
-per `.gitignore` ausgeschlossen). **Beides sicher aufbewahren** — ohne den
-Schlüssel kannst du keine Updates mehr hochladen.
-
-**2a. AAB lokal bauen** (braucht Android-SDK, z. B. über Android Studio):
-
-```bash
-bash scripts/setup_platforms.sh   # bindet key.properties in android/ ein
-flutter build appbundle
-# → build/app/outputs/bundle/release/app-release.aab
-```
-
-**2b. … oder von der CI bauen lassen** — unter *Settings → Secrets and variables
-→ Actions* anlegen:
-
-| Secret | Inhalt |
+| | |
 |---|---|
-| `ANDROID_KEYSTORE_BASE64` | `base64 -w0 upload-keystore.jks` |
-| `ANDROID_KEYSTORE_PASSWORD` | Passwort |
-| `ANDROID_KEY_PASSWORD` | Passwort (dasselbe) |
-| `ANDROID_KEY_ALIAS` | `upload` |
+| **Anleitung** | [docs/PLAY-STORE.md](docs/PLAY-STORE.md) — Signatur, Secrets, Release-Ablauf, Store-Texte, Antworten der Fragebögen, Probleme |
+| **Grafiken** | [store/](store/) — Symbol, Vorstellungsgrafik, Screenshots (Telefon, 7"/10"-Tablet); [store/README.md](store/README.md) |
+| **Datenschutz** | [docs/DATENSCHUTZ.md](docs/DATENSCHUTZ.md) — die URL in der Play Console |
+| **Upload-Schlüssel** | `upload-keystore.jks` + `key.properties` — **nicht im Repo**, extern gesichert, in der CI als Secrets |
 
-Danach hängt an jedem CI-Lauf zusätzlich das Artefakt `android-aab`, und jedes
-GitHub-Release enthält neben der APK auch die `.aab`.
-
-**3. Hochladen:** [Play Console](https://play.google.com/console) → App anlegen →
-*Testen und veröffentlichen* → z. B. *Interner Test* → Release erstellen → `.aab`
-hochladen.
-
-> **Versionscode:** Jede hochgeladene AAB braucht einen höheren Versionscode —
-> den vergibt die CI automatisch (siehe [Herunterladen](#herunterladen)).
-> Einfach die `.aab` aus dem neuesten Release nehmen.
-
-> **„Mit dem falschen Schlüssel signiert“?** Dann kennt die Play Console einen
-> anderen Upload-Schlüssel. Der Fingerabdruck der CI-AAB steht im Protokoll des
-> Schritts *Play-Store-Bundle (AAB) bauen*. Entweder den passenden Schlüssel in
-> die Secrets legen oder in der Play Console unter *Einstellungen →
-> App-Integrität → Upload-Schlüssel zurücksetzen* das neue Zertifikat
-> (`keytool -export -rfc -alias upload -keystore upload-keystore.jks -file upload_certificate.pem`)
-> hochladen.
-
-> **Paketname:** `de.phytech.rimperio_app` — lässt sich nach dem ersten Upload
-> nicht mehr ändern.
+> **Wichtig:** Ohne den Upload-Schlüssel lassen sich keine Updates mehr
+> hochladen. Fingerabdrücke und das Vorgehen bei Verlust stehen in
+> [docs/PLAY-STORE.md](docs/PLAY-STORE.md#1-signatur).
 
 ---
 
@@ -182,8 +146,12 @@ Neues Logo? Die drei Dateien ersetzen und `dart run flutter_launcher_icons` ausf
 | [`lib/ui/`](lib/ui/) | Farben, gemeinsame Bausteine |
 | [`scripts/setup_platforms.sh`](scripts/setup_platforms.sh) | erzeugt und konfiguriert `android/` und `ios/` |
 | [`scripts/create_upload_key.sh`](scripts/create_upload_key.sh) | Upload-Schlüssel + `key.properties` für den Play Store |
+| [`scripts/store/`](scripts/store/) | erzeugt die Store-Grafiken, macht persönliche Daten in Screenshots unkenntlich |
+| [`store/`](store/) | Store-Grafiken: Symbol, Vorstellungsgrafik, Screenshots |
+| [`docs/PLAY-STORE.md`](docs/PLAY-STORE.md) | Play Store: Signatur, Release-Ablauf, Store-Texte, Fragebögen |
+| [`docs/DATENSCHUTZ.md`](docs/DATENSCHUTZ.md) | Datenschutzerklärung (URL für die Play Console) |
 | [`test/widget_test.dart`](test/widget_test.dart) | Tests: Adressen, QR-Code, Token-Ablauf, Einrichtung |
-| [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | CI: Analyse, Tests, APK, iOS-Build, Release bei neuer Version auf `main` oder Tag |
+| [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | CI: Analyse, Tests, APK, AAB, iOS-Build; Version automatisch, Release bei App-Änderung auf `main` |
 
 ---
 
