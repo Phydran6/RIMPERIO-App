@@ -2,10 +2,13 @@
 // Datei:        lib/screens/patches_page.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.07.12.00.00
+// Version:      2026.11.23.06.00.00
 //
 // Beschreibung: Patchmanagement unterwegs — offene Freigaben samt
-//               KI-Einschätzung freigeben/ablehnen/zurückstellen, Läufe
+//               KI-Einschätzung freigeben/ablehnen/zurückstellen; alle
+//               offenen Updates je Rechner und Container sehen und die
+//               freigegebenen sofort installieren (ein Lauf je Rechner mit
+//               Snapshot, Vorher/Nachher, Neustart und Prüfung); Läufe
 //               ansehen und im Notfall zurückrollen. Entscheiden dürfen nur
 //               Admins (der Server prüft das ohnehin).
 // ---------------------------------------------------------------------------
@@ -25,15 +28,20 @@ class PatchesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final installable = context.session.hasCapability('patch-installable');
     return DefaultTabController(
-      length: 2,
-      initialIndex: initialTab,
+      length: installable ? 3 : 2,
+      initialIndex: installable ? initialTab : (initialTab == 2 ? 1 : initialTab.clamp(0, 1)),
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Updates'),
-          bottom: const TabBar(tabs: [Tab(text: 'Freigaben'), Tab(text: 'Läufe')]),
+          bottom: TabBar(tabs: [
+            const Tab(text: 'Freigaben'),
+            if (installable) const Tab(text: 'Installieren'),
+            const Tab(text: 'Läufe'),
+          ]),
         ),
-        body: const TabBarView(children: [_Approvals(), _Runs()]),
+        body: TabBarView(children: [const _Approvals(), if (installable) const _Install(), const _Runs()]),
       ),
     );
   }
@@ -286,6 +294,8 @@ class _Runs extends StatelessWidget {
                   final r = items[i];
                   final status = r['status'] as String? ?? '';
                   return ListTile(
+                    onTap: () => Navigator.of(context)
+                        .push(MaterialPageRoute(builder: (_) => _RunDetailPage(id: r['id'] as int))),
                     leading: _RunIcon(status),
                     title: Text('${r['host']} · ${r['items']} Updates'),
                     subtitle: Text([
@@ -360,5 +370,264 @@ class _RunIcon extends StatelessWidget {
       _ => (Icons.autorenew_rounded, context.cs.primary),
     };
     return Icon(i, color: c, size: 32);
+  }
+}
+
+
+// ---------------------------------------------------------------------------
+// Installieren: alles Offene je Rechner, freigegebene sofort einspielen
+// ---------------------------------------------------------------------------
+class _Install extends StatefulWidget {
+  const _Install();
+  @override
+  State<_Install> createState() => _InstallState();
+}
+
+class _InstallState extends State<_Install> {
+  final _key = GlobalKey<AsyncViewState<Map<String, dynamic>>>();
+  bool _busy = false;
+
+  Future<void> _installHost(Map<String, dynamic> h, {List<int>? only}) async {
+    final s = context.session;
+    final items = (h['items'] as List).cast<Map<String, dynamic>>();
+    final ids = only ?? items.where((i) => i['installable'] == true).map((i) => i['id'] as int).toList();
+    if (ids.isEmpty) return;
+    final dbItems = items.where((i) => ids.contains(i['id']) && i['db'] == true).length;
+    final ok = await confirmDialog(
+      context,
+      '${h['host']}: ${ids.length} Update(s) installieren?',
+      [
+        'Ein Lauf mit allem, was dazugehört: ${h['snapshot_possible'] == true ? 'Proxmox-Snapshot, ' : ''}'
+            'Zustand vorher, Installation, Neustart falls nötig, Prüfung danach.',
+        if (dbItems > 0) '$dbItems Datenbank-Container laufen als DB-Update mit Sicherung und Probelauf.',
+        if (h['online'] != true) 'Achtung: der Rechner ist gerade offline – der Lauf startet, sobald er sich meldet.',
+      ].join('\n\n'),
+      action: 'Installieren',
+    );
+    if (!ok || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      final r = await s.api!.postJson('/api/app/patching/install', {'agent_uid': h['agent_uid'], 'item_ids': ids});
+      HapticFeedback.mediumImpact();
+      if (!mounted) return;
+      showInfo(context, r['id'] == null ? '${r['message'] ?? 'DB-Update gestartet.'}' : 'Lauf #${r['id']} gestartet.');
+      await _key.currentState?.reload();
+    } catch (e) {
+      if (mounted) showError(context, e);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _installAll(Map<String, dynamic> d) async {
+    final n = (d['totals'] as Map)['installable'] ?? 0;
+    final ok = await confirmDialog(context, 'Alle freigegebenen Updates installieren?',
+        '$n Update(s) auf allen Rechnern – je Rechner ein Lauf mit Snapshot, Prüfung und Rückweg.',
+        action: 'Alle installieren');
+    if (!ok || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      final r = await context.session.api!.postJson('/api/app/patching/install-all', const {});
+      if (!mounted) return;
+      final started = (r['started'] as List).length;
+      final skipped = (r['skipped'] as List).cast<Map>();
+      showInfo(context,
+          '$started Lauf/Läufe gestartet${skipped.isEmpty ? '' : ' · ${skipped.length} übersprungen (${skipped.first['reason']})'}');
+      await _key.currentState?.reload();
+    } catch (e) {
+      if (mounted) showError(context, e);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _scan([String? uid]) async {
+    try {
+      final r = await context.session.api!.postJson('/api/app/patching/scan', {'agent_uid': uid});
+      if (mounted) showInfo(context, '${r['queued']} Suche(n) eingereiht – Ergebnisse in ein paar Minuten.');
+    } catch (e) {
+      if (mounted) showError(context, e);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.session;
+    return AsyncView<Map<String, dynamic>>(
+      key: _key,
+      load: () => s.api!.getJson('/api/app/patching/open'),
+      builder: (context, d, reload) {
+        final hosts = (d['hosts'] as List).cast<Map<String, dynamic>>();
+        final totals = (d['totals'] as Map).cast<String, dynamic>();
+        final cs = context.cs;
+        return Column(children: [
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: reload,
+              child: ListView(padding: const EdgeInsets.only(bottom: 16), children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Text(
+                      '${fmtInt(totals['installable'])} installierbar · ${fmtInt(totals['needs_approval'])} brauchen eine Freigabe'
+                      '${(totals['reviewing'] ?? 0) > 0 ? ' · ${totals['reviewing']} in KI-Prüfung' : ''}',
+                      style: TextStyle(color: cs.onSurfaceVariant)),
+                ),
+                if (hosts.isEmpty)
+                  const EmptyState(
+                      icon: Icons.verified_rounded, title: 'Alles aktuell', text: 'Keine offenen Updates auf den Rechnern.'),
+                for (final h in hosts) _hostCard(context, h),
+              ]),
+            ),
+          ),
+          if (s.isAdmin)
+            SafeArea(
+              top: false,
+              child: Material(
+                color: cs.surfaceContainer,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                  child: Row(children: [
+                    TextButton.icon(onPressed: _busy ? null : () => _scan(), icon: const Icon(Icons.refresh), label: const Text('Suchen')),
+                    const Spacer(),
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+                      onPressed: _busy || (totals['installable'] ?? 0) == 0 ? null : () => _installAll(d),
+                      icon: const Icon(Icons.system_update_alt_rounded),
+                      label: Text('Alle installieren (${totals['installable']})'),
+                    ),
+                  ]),
+                ),
+              ),
+            ),
+        ]);
+      },
+    );
+  }
+
+  Widget _hostCard(BuildContext context, Map<String, dynamic> h) {
+    final s = context.session;
+    final cs = context.cs;
+    final items = (h['items'] as List).cast<Map<String, dynamic>>();
+    final run = h['active_run'] as Map?;
+    final installable = (h['installable'] as int?) ?? 0;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: ExpansionTile(
+          initiallyExpanded: installable > 0 && items.length <= 8,
+          leading: Icon(
+              (h['platform'] ?? '') == 'windows' ? Icons.computer_rounded : Icons.dns_rounded,
+              color: h['online'] == true ? const Color(0xFF30A46C) : cs.outline),
+          title: Text('${h['host']}', style: const TextStyle(fontWeight: FontWeight.w600)),
+          subtitle: Text([
+            '${items.length} offen',
+            if (installable > 0) '$installable installierbar',
+            if (run != null) 'Lauf #${run['id']} läuft',
+            if (h['online'] != true) 'offline',
+          ].join(' · ')),
+          children: [
+            for (final it in items)
+              ListTile(
+                dense: true,
+                leading: Icon(it['kind'] == 'docker' ? Icons.view_in_ar_rounded : Icons.system_update_alt_rounded, size: 20),
+                title: Text('${it['title']}', maxLines: 2, overflow: TextOverflow.ellipsis),
+                subtitle: Wrap(spacing: 6, runSpacing: 4, children: [
+                  Pill('${it['status_label']}', color: _statusColor(it['status'] as String?, cs)),
+                  if (it['security'] == true) const Pill('Sicherheit', color: Color(0xFFF5A524), icon: Icons.shield),
+                  if (it['urgent'] == true) const Pill('dringend', color: Color(0xFFE5484D)),
+                  if (it['db'] == true) Pill('DB mit Probelauf', color: cs.tertiary),
+                  if (it['reboot'] == true) Pill('Neustart', color: cs.outline),
+                  if (it['to'] != null) Text('→ ${it['to']}', style: TextStyle(color: cs.outline, fontSize: 12)),
+                ]),
+                trailing: s.isAdmin && it['installable'] == true && run == null && it['kind'] == 'docker'
+                    ? IconButton(
+                        tooltip: 'Nur diesen Container',
+                        icon: const Icon(Icons.play_circle_outline_rounded),
+                        onPressed: _busy ? null : () => _installHost(h, only: [it['id'] as int]))
+                    : null,
+              ),
+            if (s.isAdmin)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                child: Row(children: [
+                  TextButton(onPressed: () => _scan(h['agent_uid'] as String?), child: const Text('Jetzt suchen')),
+                  const Spacer(),
+                  FilledButton(
+                    style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+                    onPressed: _busy || installable == 0 || run != null ? null : () => _installHost(h),
+                    child: Text(run != null ? 'Lauf läuft' : 'Installieren ($installable)'),
+                  ),
+                ]),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Color _statusColor(String? s, ColorScheme cs) => switch (s) {
+        'needs_approval' => RimTheme.gold,
+        'approved' || 'auto' => const Color(0xFF30A46C),
+        'failed' => const Color(0xFFE5484D),
+        'installing' => cs.primary,
+        _ => cs.outline,
+      };
+}
+
+class _RunDetailPage extends StatelessWidget {
+  final int id;
+  const _RunDetailPage({required this.id});
+
+  @override
+  Widget build(BuildContext context) {
+    final api = context.session.api!;
+    return Scaffold(
+      appBar: AppBar(title: Text('Lauf #$id')),
+      body: AsyncView<Map<String, dynamic>>(
+        load: () => api.getJson('/api/app/patching/runs/$id'),
+        builder: (context, r, reload) {
+          final cs = context.cs;
+          final log = (r['log'] as List? ?? const []).cast<Map>();
+          final items = (r['item_list'] as List? ?? const []).cast<Map>();
+          return RefreshIndicator(
+            onRefresh: reload,
+            child: ListView(padding: const EdgeInsets.all(16), children: [
+              Card(
+                child: ListTile(
+                  leading: _RunIcon('${r['status']}'),
+                  title: Text('${r['hostname']}'),
+                  subtitle: Text('${_Runs._statusLabel('${r['status']}')} · ${r['trigger']} · ${r['created_by']}'),
+                ),
+              ),
+              if (r['error'] != null) ...[
+                const SizedBox(height: 8),
+                Text('${r['error']}', style: TextStyle(color: cs.error)),
+              ],
+              const SectionHeader('Updates'),
+              for (final i in items)
+                ListTile(
+                  dense: true,
+                  title: Text('${i['title']}'),
+                  subtitle: Text('${i['status_label']}${i['error'] != null ? ' · ${i['error']}' : ''}'),
+                ),
+              const SectionHeader('Verlauf'),
+              for (final l in log)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: Text('${clockTime(l['ts'] as String?)}  ${l['text']}',
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: l['level'] == 'error'
+                              ? cs.error
+                              : l['level'] == 'warning'
+                                  ? const Color(0xFFF5A524)
+                                  : cs.onSurface)),
+                ),
+            ]),
+          );
+        },
+      ),
+    );
   }
 }

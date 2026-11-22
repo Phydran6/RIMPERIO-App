@@ -2,7 +2,7 @@
 // Datei:        lib/core/storage.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.07.12.00.00
+// Version:      2026.11.23.06.00.00
 //
 // Beschreibung: Verschlüsselte Ablage auf dem Gerät (Android Keystore bzw.
 //               iOS Keychain): Server-Adresse, Sitzungs-Token und — nur wenn
@@ -25,6 +25,8 @@ class Storage {
   static const _kNotify = 'notifications_enabled';
   static const _kLastNotification = 'last_notification_id';
   static const _kInsecureOk = 'insecure_confirmed_for';
+  static const _kDeviceKey = 'device_key';
+  static const _kDeviceId = 'device_id';
 
   static Future<String?> getUrl() => _s.read(key: _kUrl);
   static Future<void> setUrl(String url) => _s.write(key: _kUrl, value: url);
@@ -51,6 +53,19 @@ class Storage {
   static Future<void> setLastNotificationId(int id) =>
       _s.write(key: _kLastNotification, value: '$id');
 
+  /// Geräteschlüssel für die Hintergrundabfrage (nur Meldungen abholen).
+  static Future<String?> getDeviceKey() => _s.read(key: _kDeviceKey);
+  static Future<int?> getDeviceId() async => int.tryParse(await _s.read(key: _kDeviceId) ?? '');
+  static Future<void> setDevice(int? id, String? key) async {
+    if (id == null || key == null) {
+      await _s.delete(key: _kDeviceKey);
+      await _s.delete(key: _kDeviceId);
+    } else {
+      await _s.write(key: _kDeviceKey, value: key);
+      await _s.write(key: _kDeviceId, value: '$id');
+    }
+  }
+
   /// Für welche http://-Adresse der Nutzer das Risiko bestätigt hat.
   static Future<String?> getInsecureConfirmed() => _s.read(key: _kInsecureOk);
   static Future<void> setInsecureConfirmed(String? url) =>
@@ -66,6 +81,8 @@ class Storage {
     await _s.delete(key: _kPassword);
     await _s.delete(key: _kBiometric);
     await _s.delete(key: _kLastNotification);
+    await _s.delete(key: _kDeviceKey);
+    await _s.delete(key: _kDeviceId);
   }
 
   /// Server wechseln: alles weg.

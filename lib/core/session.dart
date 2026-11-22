@@ -2,7 +2,7 @@
 // Datei:        lib/core/session.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.07.12.00.00
+// Version:      2026.11.23.06.00.00
 //
 // Beschreibung: Zustand der App: kein Server → Einrichtung; kein gültiger
 //               Token → Anmeldung; Biometrie an → Sperrbildschirm; sonst die
@@ -75,6 +75,7 @@ class Session extends ChangeNotifier {
 
   Future<void> changeServer() async {
     await Notifications.schedule(false);
+    await Notifications.unregisterDevice(api);
     await Storage.clearAll();
     api?.close();
     api = null;
@@ -142,6 +143,7 @@ class Session extends ChangeNotifier {
 
   Future<void> logout() async {
     await Notifications.schedule(false);
+    await Notifications.unregisterDevice(api);
     await Storage.clearSession();
     api?.token = null;
     biometricEnabled = false;
@@ -257,10 +259,17 @@ class Session extends ChangeNotifier {
       debugPrint('Bootstrap fehlgeschlagen: $e');
     }
     _go(Stage.ready);
+    if (hasCapability('device-push')) {
+      await Notifications.registerDevice(api!, name: username ?? 'Handy');
+    }
     if (await Storage.getNotify() && await Notifications.permitted()) {
       await Notifications.schedule(true);
     }
   }
+
+  /// Kann der Server das? (Liste aus /api/app/bootstrap)
+  bool hasCapability(String name) =>
+      ((bootstrap?['server']?['capabilities'] as List?) ?? const []).contains(name);
 
   void _onUnauthorized() {
     if (stage != Stage.ready && stage != Stage.loading) return;

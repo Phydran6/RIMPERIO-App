@@ -2,7 +2,7 @@
 // Datei:        lib/screens/dashboard_page.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.07.12.00.00
+// Version:      2026.11.23.06.00.00
 //
 // Beschreibung: Startbildschirm — Logs heute, Probleme, Geräte, offene
 //               Freigaben und die Verteilung nach Schweregrad.
@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import '../ui/scope.dart';
 import '../ui/theme.dart';
 import '../ui/widgets.dart';
+import 'logs_page.dart';
 import 'patches_page.dart';
 
 class DashboardPage extends StatelessWidget {
@@ -73,21 +74,21 @@ class DashboardPage extends StatelessWidget {
                     icon: Icons.receipt_long_rounded,
                     label: 'Logs heute',
                     value: fmtInt(sum['logs_today']),
-                    onTap: () => onOpenTab(1),
+                    onTap: () => LogsPage.open(context),
                   ),
                   StatTile(
                     icon: Icons.error_outline_rounded,
                     label: 'Probleme heute',
                     value: fmtInt(problems),
                     color: problems > 0 ? const Color(0xFFF2555A) : const Color(0xFF30A46C),
-                    onTap: () => onOpenTab(1),
+                    onTap: () => LogsPage.open(context),
                   ),
                   StatTile(
                     icon: Icons.devices_rounded,
                     label: 'Geräte online',
                     value: '${dev['online'] ?? 0} / ${dev['total'] ?? 0}',
                     color: offline > 0 ? const Color(0xFFF5A524) : const Color(0xFF30A46C),
-                    onTap: () => onOpenTab(2),
+                    onTap: () => onOpenTab(1),
                   ),
                   if (hasPatches)
                     StatTile(
@@ -117,7 +118,7 @@ class DashboardPage extends StatelessWidget {
                       title: Text('$failedRuns fehlgeschlagene Update-Läufe (7 Tage)',
                           style: const TextStyle(color: Colors.white)),
                       trailing: const Icon(Icons.chevron_right, color: Colors.white70),
-                      onTap: () => PatchesPage.open(context, initialTab: 1),
+                      onTap: () => PatchesPage.open(context, initialTab: 2),
                     ),
                   ),
                 ),

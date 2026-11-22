@@ -3,7 +3,7 @@
 # Datei:        scripts/setup_platforms.sh
 # Projekt:      RIMPERIO-App
 # Autor:        Phydran6
-# Version:      2026.11.22.12.00.00
+# Version:      2026.11.23.06.00.00
 #
 # Beschreibung: Erzeugt die Plattform-Ordner (android/, ios/) und richtet sie
 #               für RIMPERIO ein: App-Name, Berechtigungen (Internet, Kamera
@@ -60,6 +60,19 @@ if ! grep -q 'android.hardware.camera' "$MANIFEST"; then
   # Kamera ist kein Muss — ohne geht die Anmeldung per Passwort.
   sedi 's#<manifest xmlns:android="http://schemas.android.com/apk/res/android">#&\
     <uses-feature android:name="android.hardware.camera" android:required="false"/>#' "$MANIFEST"
+fi
+
+# Android 11+: Apps, die die App öffnen will, müssen angekündigt sein – hier
+# die RDP-App (rdp://) für den Fernzugriff auf Windows-Rechner.
+if ! grep -q 'android:scheme="rdp"' "$MANIFEST"; then
+  echo "==> Android: RDP-Apps sichtbar machen (queries)"
+  sedi 's#</manifest>#    <queries>\
+        <intent>\
+            <action android:name="android.intent.action.VIEW"/>\
+            <data android:scheme="rdp"/>\
+        </intent>\
+    </queries>\
+</manifest>#' "$MANIFEST"
 fi
 
 if [ "${RIMPERIO_CLEARTEXT:-0}" = "1" ] && ! grep -q 'usesCleartextTraffic' "$MANIFEST"; then
@@ -152,6 +165,8 @@ if [ -f "$PLIST" ]; then
     '<string>Zum Scannen des Anmelde-QR-Codes aus der RIMPERIO-Weboberfläche.</string>'
   plist_add NSFaceIDUsageDescription \
     '<string>Zum Entsperren von RIMPERIO mit Face ID.</string>'
+  plist_add LSApplicationQueriesSchemes \
+    '<array><string>rdp</string></array>'
   if [ "${RIMPERIO_CLEARTEXT:-0}" = "1" ]; then
     echo "==> iOS: unverschlüsseltes HTTP erlaubt (RIMPERIO_CLEARTEXT=1)"
     plist_add NSAppTransportSecurity \

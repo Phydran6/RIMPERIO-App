@@ -1,6 +1,6 @@
 # Datenschutzerklärung
 
-**RIMPERIO** (Android/iOS-App) · Stand: 22. November 2026
+**RIMPERIO** (Android/iOS-App) · Stand: 23. November 2026
 
 Diese Erklärung beschreibt, welche Daten die App verarbeitet. Sie ist kurz,
 weil die App mit niemandem außer **deinem eigenen Server** spricht.
@@ -43,6 +43,8 @@ in Richtung deines eigenen Servers, wie unten beschrieben:
 - dein Passwort – **nur**, wenn du die Entsperrung per Fingerabdruck /
   Gesichtserkennung eingeschaltet hast (damit die App dich nach Ablauf der
   Sitzung still neu anmelden kann)
+- ein **Geräteschlüssel** deines Servers, mit dem die App im Hintergrund neue
+  Meldungen abholt (er darf nichts anderes; Abmelden widerruft ihn am Server)
 - Einstellungen: Biometrie an/aus, Benachrichtigungen an/aus, die Kennung der
   zuletzt angezeigten Meldung, ob du eine unverschlüsselte `http://`-Verbindung
   ausdrücklich bestätigt hast
@@ -61,7 +63,8 @@ Die App ruft die Schnittstelle deines RIMPERIO-Servers auf
 |:--|:--|
 | Anmeldung | Benutzername und Passwort, ggf. der Code des Zweitfaktors – oder das einmalige Token aus dem QR-Code |
 | Danach | das Sitzungs-Token bei jeder Anfrage |
-| Benachrichtigungen | regelmäßige Abfrage neuer Meldungen (im Vordergrund etwa jede Minute, unter Android im Hintergrund etwa alle 15 Minuten) |
+| Benachrichtigungen | einmalige Anmeldung des Geräts (Name = dein Benutzername, Plattform) und danach regelmäßige Abfrage neuer Meldungen mit dem Geräteschlüssel (im Vordergrund etwa jede Minute, unter Android im Hintergrund etwa alle 15 Minuten) |
+| Fernzugriff (nur Admins, nur auf deinen Wunsch) | Befehle, die du in die Konsole tippst, gehen an deinen Server und von dort an den gewählten Rechner; die Proxmox-Konsole läuft als verschlüsselte WebSocket-Verbindung über deinen Server. Für RDP öffnet die App die RDP-App des Geräts mit der Adresse des Rechners – die Verbindung baut diese App auf, nicht RIMPERIO |
 
 Angezeigt werden die Daten, die dein Server liefert: Geräte, Logs, Meldungen,
 Updates/Freigaben, SNMP-Werte. Die App speichert diese Inhalte **nicht**
@@ -96,6 +99,7 @@ richtet sich nach dessen Betreiber.
 | **Face ID / Fingerabdruck** | Nur zum Entsperren der App. Biometrische Daten verlassen das Gerät nicht und sind für die App nicht lesbar – das Betriebssystem meldet nur „passt" oder „passt nicht" |
 | **Benachrichtigungen** | Meldungen deines Servers als System-Benachrichtigung anzeigen. Abschaltbar |
 | **Nach dem Neustart starten** | Damit die Hintergrund-Abfrage der Meldungen (Android) nach einem Neustart weiterläuft |
+| **Andere Apps öffnen (RDP)** | Nur, um eine installierte RDP-App für die Verbindung zu einem Windows-Rechner zu starten |
 
 ---
 

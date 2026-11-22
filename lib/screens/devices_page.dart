@@ -2,16 +2,20 @@
 // Datei:        lib/screens/devices_page.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.07.12.00.00
+// Version:      2026.11.23.06.00.00
 //
-// Beschreibung: Geräte mit Online-Zustand (/api/app/devices). Antippen zeigt
-//               die Logs des Geräts.
+// Beschreibung: Geräte mit Online-Zustand (/api/app/devices). Antippen zeigt,
+//               was mit dem Gerät geht: Logs, und bei Rechnern mit
+//               RIMPERIO-Agent Fernzugriff — Konsole (Linux als „rimperio“,
+//               Windows PowerShell), RDP, Updates.
 // ---------------------------------------------------------------------------
 import 'package:flutter/material.dart';
 
 import '../ui/scope.dart';
 import '../ui/widgets.dart';
+import 'console_page.dart';
 import 'logs_page.dart';
+import 'patches_page.dart';
 
 class DevicesPage extends StatefulWidget {
   const DevicesPage({super.key});
@@ -99,14 +103,83 @@ class _DevicesPageState extends State<DevicesPage> {
                       if (e['type'] != null) e['type'],
                       on ? 'online' : 'zuletzt ${relativeTime(e['last_seen'] as String?)}',
                     ].join(' · ')),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: e['host'] == null ? null : () => LogsPage.openForHost(context, e['host'] as String),
+                    trailing: e['agent_uid'] != null
+                        ? Icon(Icons.settings_remote_rounded, color: context.cs.primary)
+                        : const Icon(Icons.chevron_right),
+                    onTap: e['host'] == null ? null : () => _actions(context, e),
                   );
                 },
               ),
           ]),
         );
       },
+    );
+  }
+
+  void _actions(BuildContext context, Map<String, dynamic> e) {
+    final s = context.session;
+    final host = e['host'] as String;
+    final uid = e['agent_uid'] as String?;
+    final windows = '${e['platform'] ?? ''}'.toLowerCase().startsWith('win');
+    final remote = uid != null && s.isAdmin && s.hasCapability('remote-console');
+    final online = e['rmm_online'] == true;
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            title: Text(host, style: const TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: Text([if (e['os'] != null) e['os'], if (e['ip'] != null) e['ip']].join(' · ')),
+          ),
+          ListTile(
+            leading: const Icon(Icons.receipt_long_outlined),
+            title: const Text('Logs'),
+            onTap: () {
+              Navigator.pop(ctx);
+              LogsPage.openForHost(context, host);
+            },
+          ),
+          if (remote) ...[
+            ListTile(
+              leading: const Icon(Icons.terminal_rounded),
+              title: Text(windows ? 'PowerShell' : 'Shell (als rimperio)'),
+              subtitle: online ? null : const Text('Agent gerade offline – Befehle warten, bis er sich meldet'),
+              onTap: () {
+                Navigator.pop(ctx);
+                AgentConsolePage.open(context, uid: uid, host: host, windows: windows);
+              },
+            ),
+            if (windows && s.hasCapability('rdp')) ...[
+              ListTile(
+                leading: const Icon(Icons.desktop_windows_outlined),
+                title: const Text('Remotedesktop (RDP)'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  openRdp(context, uid, host);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.power_settings_new_rounded),
+                title: const Text('RDP auf dem Rechner einschalten'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  enableRdp(context, uid, host);
+                },
+              ),
+            ],
+            if (s.hasCapability('patch-installable'))
+              ListTile(
+                leading: const Icon(Icons.system_update_alt_rounded),
+                title: const Text('Updates'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  PatchesPage.open(context, initialTab: 1);
+                },
+              ),
+          ],
+        ]),
+      ),
     );
   }
 
