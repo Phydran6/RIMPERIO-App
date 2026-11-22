@@ -39,3 +39,6 @@ key.properties
 *.jks
 *.keystore
 upload_certificate.pem
+
+# Roh-Screenshots mit echten Daten — nie einchecken
+store/screenshots/roh/
