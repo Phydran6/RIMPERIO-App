@@ -194,6 +194,12 @@ Neues Logo? Die drei Dateien ersetzen und `dart run flutter_launcher_icons` ausf
 
 ---
 
+## Datenschutz
+
+Siehe [docs/DATENSCHUTZ.md](docs/DATENSCHUTZ.md) — die App spricht nur mit deinem eigenen Server; kein Tracking, keine Werbung.
+
+---
+
 ## Lizenz
 
 [MIT](LICENSE) — wie alle Teile des Projekts.
