@@ -124,7 +124,7 @@ GitHub-Release enthält neben der APK auch die `.aab`.
 hochladen.
 
 > **Versionscode:** Jede hochgeladene AAB braucht einen höheren Versionscode —
-> das ist die Zahl hinter dem `+` in `pubspec.yaml` (`version: 2026.11.7+3`).
+> das ist die Zahl hinter dem `+` in `pubspec.yaml` (`version: 2026.11.22+4`).
 > Vor jedem Upload hochzählen.
 
 > **Paketname:** `de.phytech.rimperio_app` — lässt sich nach dem ersten Upload
