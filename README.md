@@ -116,7 +116,8 @@ flutter build appbundle
 | `ANDROID_KEY_PASSWORD` | Passwort (dasselbe) |
 | `ANDROID_KEY_ALIAS` | `upload` |
 
-Danach hängt an jedem CI-Lauf zusätzlich das Artefakt `android-aab`.
+Danach hängt an jedem CI-Lauf zusätzlich das Artefakt `android-aab`, und jedes
+GitHub-Release enthält neben der APK auch die `.aab`.
 
 **3. Hochladen:** [Play Console](https://play.google.com/console) → App anlegen →
 *Testen und veröffentlichen* → z. B. *Interner Test* → Release erstellen → `.aab`

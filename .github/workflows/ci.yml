@@ -7,7 +7,7 @@
 #               testen, Android-APK und iOS (unsigniert) bauen. Die APK hängt
 #               30 Tage als Artefakt am Lauf, mit Signatur-Secrets auch die
 #               AAB für den Play Store (Artefakt android-aab).
-#               Ein GitHub-Release mit der APK entsteht bei einem Tag v* und
+#               Ein GitHub-Release mit APK (und AAB) entsteht bei einem Tag v* und
 #               automatisch bei einem Push auf main, wenn es für die Version
 #               aus pubspec.yaml noch keinen Tag v<Version> gibt (Tag und
 #               Release legt die CI dann an).
@@ -168,7 +168,8 @@ jobs:
       - uses: actions/download-artifact@v4
         if: steps.tag.outputs.skip != 'true'
         with:
-          name: android-apk
+          pattern: android-*
+          merge-multiple: true
           path: dist
 
       - uses: softprops/action-gh-release@v2
@@ -177,5 +178,7 @@ jobs:
           tag_name: ${{ steps.tag.outputs.tag }}
           target_commitish: ${{ github.sha }}
           name: RIMPERIO-App ${{ steps.tag.outputs.tag }}
-          files: dist/*.apk
+          files: |
+            dist/*.apk
+            dist/*.aab
           generate_release_notes: true
