@@ -95,7 +95,7 @@ if [ -f "$GRADLE" ] && ! grep -q 'keystoreProperties' "$GRADLE"; then
   echo "==> Android: Release-Signatur aus key.properties"
   export RIMPERIO_GRADLE_LOADER='// Upload-Schlüssel für den Play Store: key.properties im Repo-Wurzelordner.
 val keystorePropertiesFile = rootProject.file("../key.properties")
-val keystoreProperties = java.util.Properties()
+val keystoreProperties = Properties()
 if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
 } else {
@@ -124,6 +124,15 @@ if (keystorePropertiesFile.exists()) {
     /signingConfig = signingConfigs\.getByName\("debug"\)/ { print ENVIRON["RIMPERIO_GRADLE_RELEASE"]; next }
     { print }
   ' "$GRADLE" > "$GRADLE.tmp" && mv "$GRADLE.tmp" "$GRADLE"
+fi
+
+# Kotlin-Skript: "java.util.Properties" direkt geht nicht (java = Gradle-
+# Erweiterung) — deshalb Import ganz oben in der Datei.
+if [ -f "$GRADLE" ] && grep -q 'keystoreProperties' "$GRADLE" \
+   && ! grep -q '^import java.util.Properties' "$GRADLE"; then
+  sedi 's/java\.util\.Properties()/Properties()/' "$GRADLE"
+  { echo 'import java.util.Properties'; echo; cat "$GRADLE"; } > "$GRADLE.tmp" \
+    && mv "$GRADLE.tmp" "$GRADLE"
 fi
 
 # --- iOS -------------------------------------------------------------------
