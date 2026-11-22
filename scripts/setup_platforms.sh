@@ -3,7 +3,7 @@
 # Datei:        scripts/setup_platforms.sh
 # Projekt:      RIMPERIO-App
 # Autor:        Phydran6
-# Version:      2026.11.07.12.00.00
+# Version:      2026.11.22.12.00.00
 #
 # Beschreibung: Erzeugt die Plattform-Ordner (android/, ios/) und richtet sie
 #               für RIMPERIO ein: App-Name, Berechtigungen (Internet, Kamera
@@ -87,6 +87,45 @@ dependencies {
 EOF
 fi
 
+# Play Store: Release mit dem eigenen Upload-Schlüssel signieren. Die Daten
+# stehen in key.properties im Repo-Wurzelordner (nicht eingecheckt, siehe
+# scripts/create_upload_key.sh). Fehlt die Datei, bleibt es beim
+# Debug-Schlüssel — gut zum Installieren, vom Play Store aber abgelehnt.
+if [ -f "$GRADLE" ] && ! grep -q 'keystoreProperties' "$GRADLE"; then
+  echo "==> Android: Release-Signatur aus key.properties"
+  export RIMPERIO_GRADLE_LOADER='// Upload-Schlüssel für den Play Store: key.properties im Repo-Wurzelordner.
+val keystorePropertiesFile = rootProject.file("../key.properties")
+val keystoreProperties = java.util.Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+} else {
+    logger.warn("key.properties fehlt - Release wird mit dem Debug-Schluessel signiert (nicht Play-Store-tauglich).")
+}
+'
+  export RIMPERIO_GRADLE_SIGNING='    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = keystorePropertiesFile.parentFile.resolve(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+            }
+        }
+    }
+'
+  export RIMPERIO_GRADLE_RELEASE='            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }'
+  awk '
+    /^android \{/ { print ENVIRON["RIMPERIO_GRADLE_LOADER"] }
+    /^    buildTypes \{/ { print ENVIRON["RIMPERIO_GRADLE_SIGNING"] }
+    /signingConfig = signingConfigs\.getByName\("debug"\)/ { print ENVIRON["RIMPERIO_GRADLE_RELEASE"]; next }
+    { print }
+  ' "$GRADLE" > "$GRADLE.tmp" && mv "$GRADLE.tmp" "$GRADLE"
+fi
+
 # --- iOS -------------------------------------------------------------------
 PLIST="ios/Runner/Info.plist"
 plist_add() { # $1 = Schlüssel, $2 = XML-Wert; nur wenn noch nicht vorhanden
@@ -116,3 +155,4 @@ echo "==> App-Symbol erzeugen"
 dart run flutter_launcher_icons
 
 echo "==> Fertig. Weiter mit: flutter run   oder   flutter build apk"
+echo "    Play Store:  flutter build appbundle   (braucht key.properties)"

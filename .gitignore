@@ -33,3 +33,8 @@ Thumbs.db
 /macos/
 /windows/
 /web/
+
+# Play-Store-Upload-Schlüssel — NIE einchecken (scripts/create_upload_key.sh)
+key.properties
+*.jks
+*.keystore

@@ -2,6 +2,7 @@
 # Datei:        .github/workflows/ci.yml
 # Projekt:      RIMPERIO-App
 # Autor:        Phydran6
+<<<<<<< HEAD
 # Version:      2026.11.08.12.00.00
 # Beschreibung: Bei jedem Push/PR: Plattform-Ordner erzeugen, analysieren,
 #               testen, Android-APK und iOS (unsigniert) bauen. Die APK hängt
@@ -9,6 +10,14 @@
 #               entsteht bei einem Tag v* und automatisch bei einem Push auf
 #               main, wenn es für die Version aus pubspec.yaml noch keinen
 #               Tag v<Version> gibt (Tag und Release legt die CI dann an).
+=======
+# Version:      2026.11.22.12.00.00
+# Beschreibung: Bei jedem Push/PR: Plattform-Ordner erzeugen, analysieren,
+#               testen, Android-APK und iOS (unsigniert) bauen. Die APK hängt
+#               30 Tage als Artefakt am Lauf, mit Signatur-Secrets auch die
+#               AAB für den Play Store. Bei einem Tag v* wird daraus
+#               ein GitHub-Release mit der APK.
+>>>>>>> 9419d93 (RIMPERIO-App: Play-Store-Bundle (AAB) mit Upload-Schlüssel)
 # ---------------------------------------------------------------------------
 name: CI
 
@@ -70,6 +79,53 @@ jobs:
           name: android-apk
           path: ${{ steps.apk.outputs.name }}
           retention-days: 30
+
+      # Play Store: nur mit hinterlegtem Upload-Schlüssel (Secrets, siehe
+      # scripts/create_upload_key.sh). Ohne Secrets — z. B. bei PRs aus
+      # Forks — wird dieser Teil übersprungen.
+      - name: Upload-Schlüssel einrichten
+        id: key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "Keine Signatur-Secrets — AAB wird nicht gebaut."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload-keystore.jks"
+          {
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyPassword=$KEY_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "storeFile=$RUNNER_TEMP/upload-keystore.jks"
+          } > key.properties
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Play-Store-Bundle (AAB) bauen
+        if: steps.key.outputs.signed == 'true'
+        id: aab
+        run: |
+          flutter build appbundle --release
+          v=$(grep -E '^version:' pubspec.yaml | awk '{print $2}' | tr '+' '-')
+          name="RIMPERIO-${v}.aab"
+          cp build/app/outputs/bundle/release/app-release.aab "$name"
+          ls -lh "$name"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        if: steps.key.outputs.signed == 'true'
+        with:
+          name: android-aab
+          path: ${{ steps.aab.outputs.name }}
+          retention-days: 30
+
+      - name: Schlüssel entfernen
+        if: always()
+        run: rm -f key.properties "$RUNNER_TEMP/upload-keystore.jks"
 
   ios:
     name: iOS — bauen (ohne Signatur)

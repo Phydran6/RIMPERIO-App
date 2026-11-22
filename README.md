@@ -53,7 +53,8 @@ dazu Updates/Freigaben (inkl. KI-Einschätzung, Zurückrollen) und SNMP.
   hat 30 Tage lang die APK als Artefakt `android-apk` (Anmeldung bei GitHub nötig).
 
 Die APK ist mit dem Debug-Schlüssel von Flutter signiert — zum direkten
-Installieren gedacht, nicht für den Play Store.
+Installieren gedacht, nicht für den Play Store. Für den Play Store siehe
+[Google Play Store](#google-play-store).
 
 ---
 
@@ -78,6 +79,55 @@ flutter build apk      # Release-APK
 > dein Server nur `http://`, das Skript mit `RIMPERIO_CLEARTEXT=1 bash scripts/setup_platforms.sh`
 > aufrufen — oder besser am Server HTTPS einschalten (der Server kann das
 > automatisch, siehe `RIMPERIO_SITE_ADDRESS`).
+
+---
+
+## Google Play Store
+
+Der Play Store will ein **Android App Bundle (`.aab`)**, signiert mit deinem
+eigenen **Upload-Schlüssel** (Google signiert die App danach selbst neu —
+*Play App Signing*).
+
+**1. Upload-Schlüssel anlegen** (einmalig):
+
+```bash
+bash scripts/create_upload_key.sh
+```
+
+Das legt `upload-keystore.jks` und `key.properties` im Repo-Ordner an (beide
+per `.gitignore` ausgeschlossen). **Beides sicher aufbewahren** — ohne den
+Schlüssel kannst du keine Updates mehr hochladen.
+
+**2a. AAB lokal bauen** (braucht Android-SDK, z. B. über Android Studio):
+
+```bash
+bash scripts/setup_platforms.sh   # bindet key.properties in android/ ein
+flutter build appbundle
+# → build/app/outputs/bundle/release/app-release.aab
+```
+
+**2b. … oder von der CI bauen lassen** — unter *Settings → Secrets and variables
+→ Actions* anlegen:
+
+| Secret | Inhalt |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | `base64 -w0 upload-keystore.jks` |
+| `ANDROID_KEYSTORE_PASSWORD` | Passwort |
+| `ANDROID_KEY_PASSWORD` | Passwort (dasselbe) |
+| `ANDROID_KEY_ALIAS` | `upload` |
+
+Danach hängt an jedem CI-Lauf zusätzlich das Artefakt `android-aab`.
+
+**3. Hochladen:** [Play Console](https://play.google.com/console) → App anlegen →
+*Testen und veröffentlichen* → z. B. *Interner Test* → Release erstellen → `.aab`
+hochladen.
+
+> **Versionscode:** Jede hochgeladene AAB braucht einen höheren Versionscode —
+> das ist die Zahl hinter dem `+` in `pubspec.yaml` (`version: 2026.11.7+3`).
+> Vor jedem Upload hochzählen.
+
+> **Paketname:** `de.phytech.rimperio_app` — lässt sich nach dem ersten Upload
+> nicht mehr ändern.
 
 ---
 
@@ -113,6 +163,7 @@ Neues Logo? Die drei Dateien ersetzen und `dart run flutter_launcher_icons` ausf
 | [`lib/screens/`](lib/screens/) | Einrichtung, QR-Scan, Anmeldung, Sperre, Übersicht, Logs, Geräte, Meldungen, Updates, SNMP, Mehr |
 | [`lib/ui/`](lib/ui/) | Farben, gemeinsame Bausteine |
 | [`scripts/setup_platforms.sh`](scripts/setup_platforms.sh) | erzeugt und konfiguriert `android/` und `ios/` |
+| [`scripts/create_upload_key.sh`](scripts/create_upload_key.sh) | Upload-Schlüssel + `key.properties` für den Play Store |
 | [`test/widget_test.dart`](test/widget_test.dart) | Tests: Adressen, QR-Code, Token-Ablauf, Einrichtung |
 | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | CI: Analyse, Tests, APK, iOS-Build, Release bei neuer Version auf `main` oder Tag |
 
