@@ -24,23 +24,37 @@ Eine Codebasis für **Android und iOS**.
 ## Prinzip
 
 Eine **native** App auf die schlanke App-Schnittstelle des Servers (`/api/app/*`) —
-keine WebView. Untere Navigationsleiste mit **Übersicht, Logs, Geräte, Meldungen, Mehr**;
-dazu Updates/Freigaben (inkl. KI-Einschätzung, Zurückrollen) und SNMP.
+keine WebView. Untere Navigationsleiste mit **Übersicht, Geräte, Meldungen, Mehr**.
+Unter **Mehr** liegen die Bereiche:
+
+| Bereich | Was |
+|---|---|
+| **Logs** | eigener Bereich: *Ansehen* (nur Warnung, Fehler, Kritisch – ohne Info/Hinweis), *Suchen* (alle Stufen inkl. Info/Hinweis, Text, Gerät, Zeitraum), *Themenbereiche*, *Rauschen & Sperren*, *Sperrregeln*, *Aufbewahrung*. Jede Zeile im Klartext mit Hinweis, „Diese Meldung sperren“, „KI erklärt“. Die Kacheln der Übersicht führen weiter direkt in die Logs |
+| **Updates & Freigaben** | Freigeben/ablehnen (KI-Einschätzung), **Installieren**: alle offenen Updates je Rechner und Container, freigegebene sofort einspielen (ein Lauf mit Snapshot, Prüfung, Rückweg), Läufe mit Verlauf, Zurückrollen |
+| **DB-Updates** | Datenbank-Container mit Sicherung und Probelauf prüfen, Bericht lesen, freigeben |
+| **Proxmox** | Updates der Knoten installieren, Neustart, Shell auf dem Knoten, Konsole von Containern/VMs, Agent per `pct exec` in Container |
+| **RIMPERIO-Server** | Version, Update starten, Protokoll mitlesen |
+| **SNMP** | Geräte und Probleme |
+
+**Geräte** → Rechner mit Agent: **Shell** (Linux als Dienstkonto `rimperio`), **PowerShell**
+(Windows), **RDP** (öffnet die RDP-App des Handys) und „RDP einschalten“.
 
 | | |
 |---|---|
 | **Anmeldung** | QR-Code aus der Weboberfläche (*Benutzer → App verbinden*) oder Benutzer/Passwort, mit Zweitfaktor |
 | **Biometrie** | Fingerabdruck / Face ID entsperrt die App; nach Passwort-Anmeldung meldet sie nach Ablauf der 24-h-Sitzung still neu an |
 | **Verbindung** | immer zuerst HTTPS; `http://` nur nach Warnung, danach dauerhaft rot markiert |
-| **Benachrichtigungen** | Berechtigung wird nach der Anmeldung erfragt; Abfrage im Vordergrund jede Minute, im Hintergrund (Android) etwa alle 15 min |
+| **Benachrichtigungen** | Berechtigung wird nach der Anmeldung erfragt; Abfrage im Vordergrund jede Minute, im Hintergrund (Android) etwa alle 15 min – mit eigenem Geräteschlüssel, der nicht nach 24 h abläuft. Gemeldet wird alles, was der Server unter *Meldungen → 📱* auswählt (Freigaben, Fehlschläge, Rechner offline, Checks, volle Platte, kritische Logzeilen …) |
 | **Gespeichert (verschlüsselt)** | Server-Adresse, Sitzungs-Token; das Passwort nur bei eingeschalteter Biometrie |
-| **Technik** | Flutter / Dart, `http`, `flutter_secure_storage`, `local_auth`, `mobile_scanner`, `flutter_local_notifications`, `workmanager` |
+| **Technik** | Flutter / Dart, `http`, `flutter_secure_storage`, `local_auth`, `mobile_scanner`, `flutter_local_notifications`, `workmanager`, `url_launcher` (RDP) |
 
 > **QR-Code zeigt `http://`?** Dann ist am Server keine `SITE_URL` gesetzt. Die App
 > probiert trotzdem zuerst HTTPS. Dauerhaft beheben: `SITE_URL=https://…` am Server setzen.
 
 > **Benachrichtigungen:** Der Server hat (noch) keinen Push-Dienst. Die App fragt deshalb
-> selbst nach. Unter iOS geht das nur, solange die App offen ist.
+> selbst nach – mit einem Geräteschlüssel, der nur Meldungen abholen darf und nicht nach
+> 24 h abläuft (vorher verstummte die Hintergrundabfrage mit der Sitzung). Unter iOS geht
+> das nur, solange die App offen ist. Braucht Server-API-Level 4.
 
 ---
 
@@ -142,7 +156,7 @@ Neues Logo? Die drei Dateien ersetzen und `dart run flutter_launcher_icons` ausf
 | [`lib/core/biometrics.dart`](lib/core/biometrics.dart) | Fingerabdruck / Face ID |
 | [`lib/core/notifications.dart`](lib/core/notifications.dart) | Berechtigung, Abfrage, System-Benachrichtigungen |
 | [`lib/core/storage.dart`](lib/core/storage.dart) | verschlüsselte Ablage |
-| [`lib/screens/`](lib/screens/) | Einrichtung, QR-Scan, Anmeldung, Sperre, Übersicht, Logs, Geräte, Meldungen, Updates, SNMP, Mehr |
+| [`lib/screens/`](lib/screens/) | Einrichtung, QR-Scan, Anmeldung, Sperre, Übersicht, Logs (Bereich, Ansehen/Suchen), Geräte, Meldungen, Updates, DB-Updates, Proxmox, Server, Konsole/RDP, SNMP, Mehr |
 | [`lib/ui/`](lib/ui/) | Farben, gemeinsame Bausteine |
 | [`scripts/setup_platforms.sh`](scripts/setup_platforms.sh) | erzeugt und konfiguriert `android/` und `ios/` |
 | [`scripts/create_upload_key.sh`](scripts/create_upload_key.sh) | Upload-Schlüssel + `key.properties` für den Play Store |
@@ -151,13 +165,18 @@ Neues Logo? Die drei Dateien ersetzen und `dart run flutter_launcher_icons` ausf
 | [`docs/PLAY-STORE.md`](docs/PLAY-STORE.md) | Play Store: Signatur, Release-Ablauf, Store-Texte, Fragebögen |
 | [`docs/DATENSCHUTZ.md`](docs/DATENSCHUTZ.md) | Datenschutzerklärung (URL für die Play Console) |
 | [`test/widget_test.dart`](test/widget_test.dart) | Tests: Adressen, QR-Code, Token-Ablauf, Einrichtung |
+| [`test/pages_test.dart`](test/pages_test.dart) | Tests gegen einen simulierten Server: Logs ansehen/suchen, Log-Bereich, Installieren, DB-Updates |
 | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | CI: Analyse, Tests, APK, AAB, iOS-Build; Version automatisch, Release bei App-Änderung auf `main` |
 
 ---
 
 ## Mögliche Erweiterungen
 
-- **Echter Push** (FCM/APNs) — braucht einen Push-Versand am Server.
+- **Echter Push** (FCM/APNs) — braucht einen Push-Versand am Server und ein Firebase-Projekt
+  (`google-services.json`, APNs-Schlüssel) als CI-Secrets; erst damit gibt es Meldungen auch
+  unter iOS im Hintergrund und ohne 15-min-Takt.
+- **Volles Terminal** (xterm) für die Proxmox-Konsole — bisher ein schlanker Bildschirm ohne
+  Vollbildprogramme (vim, top).
 - **Refresh-Token** am Server, damit auch QR- und MFA-Anmeldungen nach 24 h ohne neue Anmeldung weiterlaufen.
 
 ---

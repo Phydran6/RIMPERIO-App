@@ -2,7 +2,7 @@
 // Datei:        lib/ui/widgets.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.07.12.00.00
+// Version:      2026.11.23.06.00.00
 //
 // Beschreibung: Gemeinsame Bausteine: Lade-/Fehler-/Leer-Zustand, Zeitangaben,
 //               Kacheln, Abzeichen, Hinweis bei unverschlüsselter Verbindung.
@@ -122,6 +122,63 @@ void showError(BuildContext context, Object e) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(msg)));
+}
+
+/// Ja/Nein-Rückfrage. `danger` färbt die Aktion rot.
+Future<bool> confirmDialog(BuildContext context, String title, String text,
+    {String action = 'OK', bool danger = false}) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(title),
+      content: Text(text),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
+        FilledButton(
+          style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 40), backgroundColor: danger ? const Color(0xFFE5484D) : null),
+          onPressed: () => Navigator.pop(ctx, true),
+          child: Text(action),
+        ),
+      ],
+    ),
+  );
+  return ok == true;
+}
+
+/// Rückfrage mit Bestätigungswort (z. B. MIGRATE) für Eingriffe, die man
+/// nicht aus Versehen auslösen soll.
+Future<bool> confirmWord(BuildContext context, String title, String text, String word) async {
+  final ctrl = TextEditingController();
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setState) => AlertDialog(
+        title: Text(title),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(text),
+          const SizedBox(height: 12),
+          TextField(
+            controller: ctrl,
+            autofocus: true,
+            textCapitalization: TextCapitalization.characters,
+            decoration: InputDecoration(labelText: 'Zur Bestätigung $word eingeben', isDense: true),
+            onChanged: (_) => setState(() {}),
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Abbrechen')),
+          FilledButton(
+            style: FilledButton.styleFrom(minimumSize: const Size(0, 40), backgroundColor: const Color(0xFFE5484D)),
+            onPressed: ctrl.text.trim().toUpperCase() == word ? () => Navigator.pop(ctx, true) : null,
+            child: const Text('Ausführen'),
+          ),
+        ],
+      ),
+    ),
+  );
+  ctrl.dispose();
+  return ok == true;
 }
 
 void showInfo(BuildContext context, String msg) {

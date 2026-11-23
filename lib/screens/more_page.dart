@@ -2,9 +2,10 @@
 // Datei:        lib/screens/more_page.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.07.12.00.00
+// Version:      2026.11.23.06.00.00
 //
-// Beschreibung: Weitere Bereiche und Einstellungen — Updates, SNMP,
+// Beschreibung: Weitere Bereiche und Einstellungen — Logs (eigener Bereich),
+//               Updates, Proxmox, DB-Updates, RIMPERIO-Server, SNMP,
 //               Biometrie, Benachrichtigungen, Verbindung, Abmelden.
 // ---------------------------------------------------------------------------
 import 'package:flutter/material.dart';
@@ -14,7 +15,11 @@ import '../core/notifications.dart';
 import '../core/storage.dart';
 import '../ui/scope.dart';
 import '../ui/widgets.dart';
+import 'db_updates_page.dart';
+import 'log_hub_page.dart';
 import 'patches_page.dart';
+import 'pve_page.dart';
+import 'server_page.dart';
 import 'snmp_page.dart';
 
 class MorePage extends StatefulWidget {
@@ -110,12 +115,43 @@ class _MorePageState extends State<MorePage> {
           ),
         ),
         const SectionHeader('Bereiche'),
+        ListTile(
+          leading: const Icon(Icons.receipt_long_rounded),
+          title: const Text('Logs'),
+          subtitle: const Text('Ansehen, suchen, Themen, Rauschen & Sperren, Aufbewahrung'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => LogHubPage.open(context),
+        ),
         if (caps.contains('patch-approvals'))
           ListTile(
             leading: const Icon(Icons.system_update_alt_rounded),
             title: const Text('Updates & Freigaben'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => PatchesPage.open(context),
+          ),
+        if (caps.contains('db-updates'))
+          ListTile(
+            leading: const Icon(Icons.storage_rounded),
+            title: const Text('DB-Updates'),
+            subtitle: const Text('Datenbank-Container mit Sicherung und Probelauf'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => DbUpdatesPage.open(context),
+          ),
+        if (caps.contains('pve-updates'))
+          ListTile(
+            leading: const Icon(Icons.dns_rounded),
+            title: const Text('Proxmox'),
+            subtitle: const Text('Updates der Knoten, Shell, Konsole der Container'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => PvePage.open(context),
+          ),
+        if (caps.contains('server-update') && s.isAdmin)
+          ListTile(
+            leading: const Icon(Icons.rocket_launch_outlined),
+            title: const Text('RIMPERIO-Server'),
+            subtitle: const Text('Version und Update des Servers'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => ServerPage.open(context),
           ),
         if (caps.contains('snmp-status'))
           ListTile(
@@ -148,7 +184,7 @@ class _MorePageState extends State<MorePage> {
         SwitchListTile(
           secondary: const Icon(Icons.notifications_active_outlined),
           title: const Text('Benachrichtigungen'),
-          subtitle: const Text('Freigaben, Fehlschläge und Alarme — im Hintergrund etwa alle 15 min'),
+          subtitle: const Text('Freigaben, Fehlschläge, Alarme, kritische Logs — im Hintergrund etwa alle 15 min'),
           value: _notify,
           onChanged: _toggleNotify,
         ),

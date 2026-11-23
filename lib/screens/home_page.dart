@@ -2,9 +2,11 @@
 // Datei:        lib/screens/home_page.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.07.12.00.00
+// Version:      2026.11.23.06.00.00
 //
-// Beschreibung: Gerüst der App mit unterer Navigationsleiste. Nach der ersten
+// Beschreibung: Gerüst der App mit unterer Navigationsleiste (Übersicht,
+//               Geräte, Meldungen, Mehr). Logs sind ein eigener Bereich unter
+//               „Mehr“; die Kacheln der Übersicht führen weiter direkt hin. Nach der ersten
 //               Anmeldung fragt es einmal nach Biometrie und nach der
 //               Benachrichtigungs-Berechtigung. Im Vordergrund holt es jede
 //               Minute neue Meldungen.
@@ -21,7 +23,6 @@ import '../ui/widgets.dart';
 import 'dashboard_page.dart';
 import 'devices_page.dart';
 import 'inbox_page.dart';
-import 'logs_page.dart';
 import 'more_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -126,7 +127,6 @@ class _HomePageState extends State<HomePage> {
     final s = context.session;
     final pages = [
       DashboardPage(onOpenTab: (i) => setState(() => _tab = i)),
-      const LogsPage(),
       const DevicesPage(),
       InboxPage(onUnreadChanged: (n) => setState(() => _unread = n)),
       const MorePage(),
@@ -150,8 +150,6 @@ class _HomePageState extends State<HomePage> {
               icon: Icon(Icons.space_dashboard_outlined),
               selectedIcon: Icon(Icons.space_dashboard),
               label: 'Übersicht'),
-          const NavigationDestination(
-              icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: 'Logs'),
           const NavigationDestination(
               icon: Icon(Icons.devices_other_outlined), selectedIcon: Icon(Icons.devices_other), label: 'Geräte'),
           NavigationDestination(

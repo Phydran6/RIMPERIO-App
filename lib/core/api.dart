@@ -2,7 +2,7 @@
 // Datei:        lib/core/api.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.07.12.00.00
+// Version:      2026.11.23.06.00.00
 //
 // Beschreibung: Schlanker Client für die RIMPERIO-API. Anmeldung über
 //               /api/auth/*, alles Weitere über die App-Schnittstelle
@@ -128,6 +128,16 @@ class Api {
     return _decode(res) as Map<String, dynamic>;
   }
 
+  /// Für Endpunkte, die eine Liste statt eines Objekts liefern.
+  Future<Object?> getRaw(String path, [Map<String, Object?>? query]) async {
+    final q = <String, String>{
+      for (final e in (query ?? const {}).entries)
+        if (e.value != null && '${e.value}'.isNotEmpty) e.key: '${e.value}',
+    };
+    final res = await _send(() => _http.get(server.resolve(path, q), headers: _headers));
+    return _decode(res);
+  }
+
   Future<Map<String, dynamic>> postJson(String path, Object body) async {
     final res = await _send(() => _http.post(
           server.resolve(path),
@@ -136,6 +146,42 @@ class Api {
         ));
     final data = _decode(res);
     return data is Map<String, dynamic> ? data : {'result': data};
+  }
+
+  Future<Map<String, dynamic>> putJson(String path, Object body) async {
+    final res = await _send(() => _http.put(
+          server.resolve(path),
+          headers: {..._headers, 'Content-Type': 'application/json'},
+          body: jsonEncode(body),
+        ));
+    final data = _decode(res);
+    return data is Map<String, dynamic> ? data : {'result': data};
+  }
+
+  Future<Map<String, dynamic>> delete(String path) async {
+    final res = await _send(() => _http.delete(server.resolve(path), headers: _headers));
+    final data = _decode(res);
+    return data is Map<String, dynamic> ? data : {'result': data};
+  }
+
+  /// Hintergrundabfrage mit Geräteschlüssel statt Sitzung (läuft nicht nach
+  /// 24 h ab und darf nur neue Meldungen abholen).
+  Future<Map<String, dynamic>> pushPoll(String deviceKey, int? sinceId, int limit) async {
+    final q = <String, String>{'limit': '$limit', if (sinceId != null) 'since_id': '$sinceId'};
+    final res = await _send(
+      () => _http.get(server.resolve('/api/app/push', q), headers: {
+        'Accept': 'application/json',
+        'X-Device-Key': deviceKey,
+      }),
+      auth: false,
+    );
+    return _decode(res) as Map<String, dynamic>;
+  }
+
+  /// Kurzlebiges Ticket (60 s) für WebSocket-Verbindungen (Konsole).
+  Future<String> ticket(String purpose) async {
+    final d = await postJson('/api/auth/ticket', {'purpose': purpose});
+    return d['ticket'] as String;
   }
 
   // ---- Intern -------------------------------------------------------------

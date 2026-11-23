@@ -2,10 +2,12 @@
 // Datei:        lib/core/notifications.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.07.12.00.00
+// Version:      2026.11.23.06.00.00
 //
 // Beschreibung: Benachrichtigungen. Der Server kennt keinen Push-Dienst — die
-//               App fragt deshalb /api/app/notifications?since_id=… ab:
+//               App fragt deshalb neue Meldungen ab, mit dem Geräteschlüssel
+//               (/api/app/push, läuft nicht nach 24 h ab) bzw. ohne ihn mit der
+//               Sitzung (/api/app/notifications?since_id=…):
 //                 * im Vordergrund jede Minute,
 //                 * im Hintergrund (Android, WorkManager) alle 15 Minuten —
 //                   das ist das kürzeste, was Android erlaubt.
@@ -112,15 +114,28 @@ class Notifications {
     if (!await Storage.getNotify()) return 0;
     final url = await Storage.getUrl();
     final token = await Storage.getToken();
-    if (url == null || token == null) return 0;
+    final deviceKey = await Storage.getDeviceKey();
+    if (url == null || (token == null && deviceKey == null)) return 0;
 
     final api = Api(ServerAddress.parse(url), token: token);
     try {
       final last = await Storage.getLastNotificationId();
-      final data = await api.getJson('/api/app/notifications', {
-        'since_id': last,
-        'limit': last == null ? 1 : 20,
-      });
+      // Mit Geräteschlüssel klappt das auch, wenn die 24-h-Sitzung abgelaufen
+      // ist — genau dann kamen früher keine Benachrichtigungen mehr.
+      final Map<String, dynamic> data;
+      if (deviceKey != null) {
+        try {
+          data = await api.pushPoll(deviceKey, last, last == null ? 1 : 20);
+        } on ApiException catch (e) {
+          if (e.isUnauthorized) await Storage.setDevice(null, null); // widerrufen
+          rethrow;
+        }
+      } else {
+        data = await api.getJson('/api/app/notifications', {
+          'since_id': last,
+          'limit': last == null ? 1 : 20,
+        });
+      }
       final items = (data['items'] as List).cast<Map<String, dynamic>>();
       final newest = data['newest_id'];
       if (newest is int) await Storage.setLastNotificationId(newest);
@@ -139,6 +154,31 @@ class Notifications {
     } finally {
       api.close();
     }
+  }
+
+  /// Gerät beim Server für die Hintergrundabfrage anmelden (einmal je Anmeldung).
+  static Future<void> registerDevice(Api api, {String name = 'Handy'}) async {
+    if (await Storage.getDeviceKey() != null) return;
+    try {
+      final d = await api.postJson('/api/app/devices/register', {
+        'name': name,
+        'platform': Platform.isAndroid ? 'android' : (Platform.isIOS ? 'ios' : 'other'),
+      });
+      await Storage.setDevice(d['device_id'] as int?, d['device_key'] as String?);
+    } catch (e) {
+      debugPrint('Gerät nicht angemeldet: $e');
+    }
+  }
+
+  /// Beim Abmelden: Schlüssel am Server widerrufen.
+  static Future<void> unregisterDevice(Api? api) async {
+    final id = await Storage.getDeviceId();
+    if (api != null && id != null) {
+      try {
+        await api.delete('/api/app/devices/$id');
+      } catch (_) {}
+    }
+    await Storage.setDevice(null, null);
   }
 
   static Future<void> _show(Map<String, dynamic> n) async {
