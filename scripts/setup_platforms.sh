@@ -3,12 +3,13 @@
 # Datei:        scripts/setup_platforms.sh
 # Projekt:      RIMPERIO-App
 # Autor:        Phydran6
-# Version:      2026.11.23.06.00.00
+# Version:      2026.11.24.12.00.00
 #
 # Beschreibung: Erzeugt die Plattform-Ordner (android/, ios/) und richtet sie
 #               für RIMPERIO ein: App-Name, Berechtigungen (Internet, Kamera
 #               für den QR-Code, Benachrichtigungen, Biometrie),
-#               FragmentActivity für local_auth, Desugaring für
+#               MainActivity (FragmentActivity für local_auth, App-Update),
+#               Selbst-Update-Berechtigung (abschaltbar), Desugaring für
 #               flutter_local_notifications, App-Symbol. Läuft lokal (Linux,
 #               macOS, Git Bash unter Windows) und in der CI gleich.
 #               Mehrfach ausführbar.
@@ -18,6 +19,9 @@
 #                 → erlaubt zusätzlich unverschlüsseltes http:// (Android und
 #                   iOS), z. B. für einen Server im LAN ohne HTTPS. Die App
 #                   warnt dann trotzdem bei jeder http-Verbindung.
+#               RIMPERIO_SELF_UPDATE=0 bash scripts/setup_platforms.sh
+#                 → ohne Selbst-Update (REQUEST_INSTALL_PACKAGES) — für ein
+#                   Bundle, das in den Play Store geht. Vorgabe: an.
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
@@ -80,11 +84,22 @@ if [ "${RIMPERIO_CLEARTEXT:-0}" = "1" ] && ! grep -q 'usesCleartextTraffic' "$MA
   sedi 's#<application#<application android:usesCleartextTraffic="true"#' "$MANIFEST"
 fi
 
-# local_auth zeigt den Biometrie-Dialog als Fragment → FragmentActivity nötig.
+# MainActivity kommt aus der Vorlage scripts/android/MainActivity.kt:
+# FlutterFragmentActivity (local_auth zeigt den Biometrie-Dialog als Fragment)
+# und der Kanal für das App-Update (Prüfsumme, PackageInstaller).
 MAIN_ACTIVITY="$(find android/app/src/main -name 'MainActivity.kt' | head -1)"
-if [ -n "$MAIN_ACTIVITY" ] && ! grep -q 'FlutterFragmentActivity' "$MAIN_ACTIVITY"; then
-  echo "==> Android: MainActivity → FlutterFragmentActivity (Biometrie)"
-  sedi 's/io\.flutter\.embedding\.android\.FlutterActivity/io.flutter.embedding.android.FlutterFragmentActivity/; s/: FlutterActivity()/: FlutterFragmentActivity()/' "$MAIN_ACTIVITY"
+if [ -n "$MAIN_ACTIVITY" ]; then
+  echo "==> Android: MainActivity aus der Vorlage (Biometrie, App-Update)"
+  PKG="$(sed -n 's/^package[[:space:]]*\([A-Za-z0-9_.]*\).*/\1/p' "$MAIN_ACTIVITY" | head -1)"
+  sed "s/__PACKAGE__/${PKG:-de.phytech.rimperio_app}/" scripts/android/MainActivity.kt > "$MAIN_ACTIVITY"
+fi
+
+# Selbst-Update aus dem GitHub-Release: nur mit REQUEST_INSTALL_PACKAGES.
+# Für ein Play-Store-Bundle aus: RIMPERIO_SELF_UPDATE=0
+if [ "${RIMPERIO_SELF_UPDATE:-1}" = "0" ]; then
+  bash scripts/self_update_permission.sh off
+else
+  bash scripts/self_update_permission.sh on
 fi
 
 # flutter_local_notifications braucht Core-Library-Desugaring.

@@ -2,19 +2,22 @@
 // Datei:        lib/screens/more_page.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.23.06.00.00
+// Version:      2026.11.24.12.00.00
 //
 // Beschreibung: Weitere Bereiche und Einstellungen — Logs (eigener Bereich),
 //               Updates, Proxmox, DB-Updates, RIMPERIO-Server, SNMP,
-//               Biometrie, Benachrichtigungen, Verbindung, Abmelden.
+//               Biometrie, Benachrichtigungen, App-Update, Verbindung,
+//               Abmelden.
 // ---------------------------------------------------------------------------
 import 'package:flutter/material.dart';
 
+import '../core/app_update.dart';
 import '../core/biometrics.dart';
 import '../core/notifications.dart';
 import '../core/storage.dart';
 import '../ui/scope.dart';
 import '../ui/widgets.dart';
+import 'app_update_page.dart';
 import 'db_updates_page.dart';
 import 'log_hub_page.dart';
 import 'patches_page.dart';
@@ -32,6 +35,7 @@ class _MorePageState extends State<MorePage> {
   bool? _bioAvailable;
   bool _notify = false;
   bool _notifyPermitted = false;
+  InstalledApp? _app;
 
   @override
   void initState() {
@@ -43,8 +47,10 @@ class _MorePageState extends State<MorePage> {
     final bio = await Biometrics.available();
     final n = await Storage.getNotify();
     final p = await Notifications.permitted();
+    final app = await AppUpdate.installed();
     if (mounted) {
       setState(() {
+        _app = app;
         _bioAvailable = bio;
         _notify = n && p;
         _notifyPermitted = p;
@@ -188,6 +194,25 @@ class _MorePageState extends State<MorePage> {
           value: _notify,
           onChanged: _toggleNotify,
         ),
+        const SectionHeader('App'),
+        ValueListenableBuilder<AppRelease?>(
+          valueListenable: AppUpdate.available,
+          builder: (context, update, _) => ListTile(
+            leading: Badge(
+              isLabelVisible: update != null,
+              child: Icon(Icons.system_update_rounded, color: update != null ? cs.primary : null),
+            ),
+            title: const Text('App-Update'),
+            subtitle: Text(update != null
+                ? 'Neue Version ${update.version} – jetzt installieren'
+                : 'Version ${_app?.label ?? '–'} · auf GitHub nach Updates suchen'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () async {
+              await AppUpdatePage.open(context);
+              if (mounted) setState(() {});
+            },
+          ),
+        ),
         const SectionHeader('Konto'),
         ListTile(
           leading: const Icon(Icons.logout_rounded),
@@ -216,7 +241,8 @@ class _MorePageState extends State<MorePage> {
         Padding(
           padding: const EdgeInsets.all(24),
           child: Text(
-            'Server ${s.bootstrap?['server']?['version'] ?? '–'} · API-Level ${s.bootstrap?['server']?['api_level'] ?? '–'}',
+            'App ${_app?.label ?? '–'} · Server ${s.bootstrap?['server']?['version'] ?? '–'} · '
+            'API-Level ${s.bootstrap?['server']?['api_level'] ?? '–'}',
             textAlign: TextAlign.center,
             style: TextStyle(color: cs.outline, fontSize: 12),
           ),

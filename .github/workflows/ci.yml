@@ -2,7 +2,7 @@
 # Datei:        .github/workflows/ci.yml
 # Projekt:      RIMPERIO-App
 # Autor:        Phydran6
-# Version:      2026.11.22.13.00.00
+# Version:      2026.11.24.12.00.00
 # Beschreibung: Bei jedem Push/PR: Plattform-Ordner erzeugen, analysieren,
 #               testen, Android-APK, Play-Store-Bundle (AAB, nur mit
 #               Signatur-Secrets) und iOS (unsigniert) bauen.
@@ -17,8 +17,15 @@
 #               Release (Tag v<Name>, APK + AAB) entsteht automatisch bei
 #               einem Push auf main, wenn sich seit dem letzten Release an
 #               der App etwas geändert hat (lib/, assets/, pubspec.yaml,
-#               scripts/setup_platforms.sh). Reine Doku-/CI-Änderungen
+#               scripts/setup_platforms.sh, scripts/self_update_permission.sh,
+#               scripts/android/). Reine Doku-/CI-Änderungen
 #               lösen keins aus. "Run workflow" auf main erzwingt eins.
+#
+#               Signatur: APK und AAB mit demselben Upload-Schlüssel (Secrets).
+#               Nur so lässt sich die APK über die vorige drüber installieren —
+#               und damit auch per Knopfdruck aus der App (Mehr → App-Update).
+#               Das AAB (Play Store) wird ohne REQUEST_INSTALL_PACKAGES gebaut,
+#               die APK mit.
 # ---------------------------------------------------------------------------
 name: CI
 
@@ -72,11 +79,11 @@ jobs:
               if [ -z "$last" ]; then
                 echo "Noch kein Release → Release."
                 release=true
-              elif git diff --quiet "$last" HEAD -- lib assets pubspec.yaml scripts/setup_platforms.sh; then
+              elif git diff --quiet "$last" HEAD -- lib assets pubspec.yaml scripts/setup_platforms.sh scripts/self_update_permission.sh scripts/android; then
                 echo "Keine App-Änderung seit $last → kein Release."
               else
                 echo "App geändert seit $last:"
-                git diff --stat "$last" HEAD -- lib assets pubspec.yaml scripts/setup_platforms.sh
+                git diff --stat "$last" HEAD -- lib assets pubspec.yaml scripts/setup_platforms.sh scripts/self_update_permission.sh scripts/android
                 release=true
               fi
             fi
@@ -111,7 +118,8 @@ jobs:
           cache: true
 
       - name: Plattform einrichten (android/ios, Name, Icon)
-        run: bash scripts/setup_platforms.sh
+        # Erst ohne Selbst-Update-Berechtigung — so geht das AAB in den Play Store.
+        run: RIMPERIO_SELF_UPDATE=0 bash scripts/setup_platforms.sh
 
       - name: Analyse
         run: flutter analyze --no-fatal-infos
@@ -119,21 +127,9 @@ jobs:
       - name: Tests
         run: flutter test
 
-      - name: Release-APK bauen
-        run: |
-          flutter build apk --release --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
-          cp build/app/outputs/flutter-apk/app-release.apk "RIMPERIO-${BUILD_NAME}.apk"
-          ls -lh RIMPERIO-*.apk
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android-apk
-          path: RIMPERIO-*.apk
-          retention-days: 30
-
-      # Play Store: nur mit hinterlegtem Upload-Schlüssel (Secrets, siehe
-      # scripts/create_upload_key.sh). Ohne Secrets — z. B. bei PRs aus
-      # Forks — wird dieser Teil übersprungen.
+      # Upload-Schlüssel (Secrets, siehe scripts/create_upload_key.sh) für AAB
+      # und APK. Ohne Secrets — z. B. bei PRs aus Forks — bleibt es beim
+      # Debug-Schlüssel und es gibt kein AAB.
       - name: Upload-Schlüssel einrichten
         id: key
         env:
@@ -143,7 +139,7 @@ jobs:
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "Keine Signatur-Secrets — AAB wird nicht gebaut."
+            echo "Keine Signatur-Secrets — APK mit Debug-Schlüssel, kein AAB."
             echo "signed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -156,9 +152,12 @@ jobs:
           } > key.properties
           echo "signed=true" >> "$GITHUB_OUTPUT"
 
-      - name: Play-Store-Bundle (AAB) bauen
+      - name: Play-Store-Bundle (AAB) bauen — ohne Selbst-Update
         if: steps.key.outputs.signed == 'true'
         run: |
+          if grep -q REQUEST_INSTALL_PACKAGES android/app/src/main/AndroidManifest.xml; then
+            echo "::error::REQUEST_INSTALL_PACKAGES darf nicht ins Play-Store-Bundle."; exit 1
+          fi
           flutter build appbundle --release --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
           cp build/app/outputs/bundle/release/app-release.aab "RIMPERIO-${BUILD_NAME}-${BUILD_NUMBER}.aab"
           ls -lh RIMPERIO-*.aab
@@ -171,6 +170,26 @@ jobs:
         with:
           name: android-aab
           path: RIMPERIO-*.aab
+          retention-days: 30
+
+      - name: Release-APK bauen — mit Selbst-Update
+        run: |
+          bash scripts/self_update_permission.sh on
+          flutter build apk --release --build-name "$BUILD_NAME" --build-number "$BUILD_NUMBER"
+          cp build/app/outputs/flutter-apk/app-release.apk "RIMPERIO-${BUILD_NAME}.apk"
+          ls -lh RIMPERIO-*.apk
+          # Berechtigung und Signatur ins Protokoll. Der Fingerabdruck muss
+          # von Release zu Release gleich bleiben — sonst lehnt Android das
+          # Update ab.
+          BT="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          "$BT/aapt2" dump permissions "RIMPERIO-${BUILD_NAME}.apk" | grep -q REQUEST_INSTALL_PACKAGES \
+            || { echo "::error::APK ohne REQUEST_INSTALL_PACKAGES"; exit 1; }
+          "$BT/apksigner" verify --print-certs "RIMPERIO-${BUILD_NAME}.apk" | grep -E 'DN|SHA-256'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: RIMPERIO-*.apk
           retention-days: 30
 
       - name: Schlüssel entfernen
@@ -221,7 +240,7 @@ jobs:
           body: |
             Version **${{ needs.version.outputs.name }}** · Versionscode **${{ needs.version.outputs.code }}**
 
-            - `RIMPERIO-${{ needs.version.outputs.name }}.apk` — direkt aufs Handy installieren
+            - `RIMPERIO-${{ needs.version.outputs.name }}.apk` — direkt aufs Handy installieren; danach aktualisiert sich die App per Knopfdruck (Mehr → App-Update)
             - `RIMPERIO-${{ needs.version.outputs.name }}-${{ needs.version.outputs.code }}.aab` — für die Google Play Console
           files: |
             dist/*.apk
