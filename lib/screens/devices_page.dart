@@ -2,7 +2,7 @@
 // Datei:        lib/screens/devices_page.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.23.06.00.00
+// Version:      2026.11.24.21.00.00
 //
 // Beschreibung: Geräte mit Online-Zustand (/api/app/devices). Antippen zeigt,
 //               was mit dem Gerät geht: Logs, und bei Rechnern mit
@@ -174,7 +174,7 @@ class _DevicesPageState extends State<DevicesPage> {
                 title: const Text('Updates'),
                 onTap: () {
                   Navigator.pop(ctx);
-                  PatchesPage.open(context, initialTab: 1);
+                  PatchesPage.open(context, initialTab: 1, agentUid: uid, host: host);
                 },
               ),
           ],

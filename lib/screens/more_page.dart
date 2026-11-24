@@ -93,6 +93,47 @@ class _MorePageState extends State<MorePage> {
     }
   }
 
+  /// Ein Bereich unter „Mehr“. Kann der Server ihn (noch) nicht, bleibt er
+  /// trotzdem sichtbar — mit Hinweis aufs Server-Update statt unsichtbar.
+  Widget _area(List<String> caps, String cap,
+      {required IconData icon, required String title, String? subtitle, required VoidCallback onTap}) {
+    final ok = caps.contains(cap);
+    final cs = context.cs;
+    return ListTile(
+      leading: Icon(icon, color: ok ? null : cs.outline),
+      title: Text(title, style: ok ? null : TextStyle(color: cs.outline)),
+      subtitle: Text(ok ? (subtitle ?? '') : 'Braucht einen neueren RIMPERIO-Server – bitte Server aktualisieren',
+          style: ok ? null : TextStyle(color: cs.outline)),
+      trailing: Icon(ok ? Icons.chevron_right : Icons.info_outline_rounded),
+      onTap: ok ? onTap : () => _needsServerUpdate(title, caps),
+    );
+  }
+
+  Future<void> _needsServerUpdate(String title, List<String> caps) async {
+    final s = context.session;
+    final canUpdate = caps.contains('server-update') && s.isAdmin;
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.system_update_rounded, size: 36),
+        title: Text('$title: Server zu alt'),
+        content: Text('Dein RIMPERIO-Server (${s.bootstrap?['server']?['version'] ?? 'Version unbekannt'}) '
+            'kennt diesen Bereich noch nicht. Nach einem Server-Update ist er in der App da.'
+            '${canUpdate ? '' : '\n\nAktualisieren: Weboberfläche → Updates.'}'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('OK')),
+          if (canUpdate) FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Server aktualisieren')),
+        ],
+      ),
+    );
+    if (go == true && mounted) await ServerPage.open(context);
+    if (mounted) {
+      try {
+        await s.refreshBootstrap();
+      } catch (_) {}
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = context.session;
@@ -128,44 +169,29 @@ class _MorePageState extends State<MorePage> {
           trailing: const Icon(Icons.chevron_right),
           onTap: () => LogHubPage.open(context),
         ),
-        if (caps.contains('patch-approvals'))
-          ListTile(
-            leading: const Icon(Icons.system_update_alt_rounded),
-            title: const Text('Updates & Freigaben'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => PatchesPage.open(context),
-          ),
-        if (caps.contains('db-updates'))
-          ListTile(
-            leading: const Icon(Icons.storage_rounded),
-            title: const Text('DB-Updates'),
-            subtitle: const Text('Datenbank-Container mit Sicherung und Probelauf'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => DbUpdatesPage.open(context),
-          ),
-        if (caps.contains('pve-updates'))
-          ListTile(
-            leading: const Icon(Icons.dns_rounded),
-            title: const Text('Proxmox'),
-            subtitle: const Text('Updates der Knoten, Shell, Konsole der Container'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => PvePage.open(context),
-          ),
-        if (caps.contains('server-update') && s.isAdmin)
-          ListTile(
-            leading: const Icon(Icons.rocket_launch_outlined),
-            title: const Text('RIMPERIO-Server'),
-            subtitle: const Text('Version und Update des Servers'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => ServerPage.open(context),
-          ),
-        if (caps.contains('snmp-status'))
-          ListTile(
-            leading: const Icon(Icons.router_outlined),
-            title: const Text('SNMP-Geräte'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => SnmpPage.open(context),
-          ),
+        _area(caps, 'patch-approvals',
+            icon: Icons.system_update_alt_rounded,
+            title: 'Updates & Freigaben',
+            subtitle: 'Freigeben, je Rechner/Container installieren, Läufe',
+            onTap: () => PatchesPage.open(context)),
+        _area(caps, 'db-updates',
+            icon: Icons.storage_rounded,
+            title: 'DB-Updates',
+            subtitle: 'Datenbank-Container mit Sicherung und Probelauf',
+            onTap: () => DbUpdatesPage.open(context)),
+        _area(caps, 'pve-updates',
+            icon: Icons.dns_rounded,
+            title: 'Proxmox',
+            subtitle: 'Knoten-Updates, alle Knoten patchen, Zeitplan, Shell, Konsole',
+            onTap: () => PvePage.open(context)),
+        if (s.isAdmin)
+          _area(caps, 'server-update',
+              icon: Icons.rocket_launch_outlined,
+              title: 'RIMPERIO-Server',
+              subtitle: 'Version und Update des Servers',
+              onTap: () => ServerPage.open(context)),
+        _area(caps, 'snmp-status',
+            icon: Icons.router_outlined, title: 'SNMP-Geräte', onTap: () => SnmpPage.open(context)),
         const SectionHeader('Sicherheit'),
         SwitchListTile(
           secondary: const Icon(Icons.fingerprint_rounded),
@@ -194,6 +220,16 @@ class _MorePageState extends State<MorePage> {
           value: _notify,
           onChanged: _toggleNotify,
         ),
+        if (_notify)
+          ListTile(
+            leading: const Icon(Icons.notification_add_outlined),
+            title: const Text('Benachrichtigung testen'),
+            subtitle: const Text('Zeigt eine Test-Meldung und prüft die Abfrage beim Server'),
+            onTap: () async {
+              final msg = await Notifications.test();
+              if (mounted) showInfo(context, msg);
+            },
+          ),
         const SectionHeader('App'),
         ValueListenableBuilder<AppRelease?>(
           valueListenable: AppUpdate.available,

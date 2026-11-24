@@ -216,6 +216,36 @@ class Notifications {
     await AppUpdate.markNotified(r);
   }
 
+  /// Prüft den ganzen Weg: Berechtigung, Anzeige auf dem Handy, Abfrage beim
+  /// Server (mit Geräteschlüssel). Gibt eine Meldung für die Oberfläche zurück.
+  static Future<String> test() async {
+    await init();
+    if (!await permitted()) return 'Benachrichtigungen sind für RIMPERIO in den Systemeinstellungen blockiert.';
+    await _show({
+      'id': DateTime.now().millisecondsSinceEpoch ~/ 1000 % 100000,
+      'title': 'RIMPERIO: Test',
+      'body': 'So sehen Meldungen vom Server aus.',
+      'level': 'info',
+    });
+    final key = await Storage.getDeviceKey();
+    final url = await Storage.getUrl();
+    if (url == null) return 'Test angezeigt.';
+    final api = Api(ServerAddress.parse(url), token: await Storage.getToken());
+    try {
+      if (key != null) {
+        await api.pushPoll(key, await Storage.getLastNotificationId(), 1);
+        return 'Test angezeigt. Hintergrundabfrage mit Geräteschlüssel funktioniert.';
+      }
+      return 'Test angezeigt. Kein Geräteschlüssel – Meldungen kommen nur, solange die Anmeldung gilt (24 h).';
+    } on ApiException catch (e) {
+      return 'Test angezeigt, aber die Abfrage beim Server scheitert: ${e.message}';
+    } catch (e) {
+      return 'Test angezeigt, aber der Server ist nicht erreichbar: $e';
+    } finally {
+      api.close();
+    }
+  }
+
   static Future<void> _show(Map<String, dynamic> n) async {
     final level = n['level'] as String? ?? 'info';
     await _plugin.show(

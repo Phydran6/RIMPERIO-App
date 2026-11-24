@@ -2,7 +2,7 @@
 // Datei:        lib/screens/logs_page.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.23.06.00.00
+// Version:      2026.11.24.21.00.00
 //
 // Beschreibung: Logs — endlose Liste (Cursor: before_id). Zwei Arten:
 //                 * Ansehen: nur Warnungen und Schlimmeres. Info und Hinweis
@@ -43,6 +43,14 @@ const _lowGroups = [
   _LevelGroup('info', 'Info', 'info'),
   _LevelGroup('debug', 'Debug', 'debug'),
 ];
+
+/// Stufen, die beim Ansehen nie auftauchen – nur über die Suche.
+const lowLevels = {'debug', 'info', 'informational', 'notice'};
+
+/// Ansehen: Info/Hinweis/Debug weg – auch wenn ein älterer Server
+/// `exclude_low` nicht kennt und sie trotzdem schickt.
+List<Map<String, dynamic>> withoutLow(List<Map<String, dynamic>> items) =>
+    items.where((i) => !lowLevels.contains('${i['level'] ?? ''}'.toLowerCase())).toList();
 
 class LogsPage extends StatefulWidget {
   final String? hostname;
@@ -124,13 +132,15 @@ class _LogsPageState extends State<LogsPage> {
   Future<void> _loadMore() async {
     if (_loading || !_hasMore) return;
     setState(() => _loading = true);
+    var refill = false;
     try {
       final d = await context.session.api!.getJson('/api/app/logs', {
         ..._filters,
         'limit': 50,
         'before_id': _nextBefore,
       });
-      final items = (d['items'] as List).cast<Map<String, dynamic>>();
+      var items = (d['items'] as List).cast<Map<String, dynamic>>();
+      if (!_isSearch && _groups.isEmpty) items = withoutLow(items);
       if (!mounted) return;
       setState(() {
         _items.addAll(items);
@@ -140,11 +150,15 @@ class _LogsPageState extends State<LogsPage> {
         if (_items.isNotEmpty) _newest = _items.first['id'] as int;
         _error = null;
       });
+      // Bleibt die Liste nach dem Aussortieren zu kurz zum Scrollen, gleich
+      // die nächste Seite holen.
+      refill = _hasMore && _items.length < 20;
     } catch (e) {
       if (mounted) setState(() => _error = e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+    if (refill && mounted) await _loadMore();
   }
 
   void _toggleLive() {
@@ -167,6 +181,7 @@ class _LogsPageState extends State<LogsPage> {
         ..remove('levels');
       final d = await context.session.api!.getJson('/api/app/logs/tail', {...f, 'since_id': since});
       var items = (d['items'] as List).cast<Map<String, dynamic>>();
+      if (_groups.isEmpty) items = withoutLow(items);
       if (_groups.isNotEmpty) {
         // /tail kennt nur "ab Stufe" – die Auswahl hier filtern.
         final wanted = _levels!.split(',').toSet();
