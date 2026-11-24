@@ -35,6 +35,7 @@ Unter **Mehr** liegen die Bereiche:
 | **Proxmox** | Updates der Knoten installieren, Neustart, Shell auf dem Knoten, Konsole von Containern/VMs, Agent per `pct exec` in Container |
 | **RIMPERIO-Server** | Version, Update starten, Protokoll mitlesen |
 | **SNMP** | Geräte und Probleme |
+| **App-Update** | wie beim Server: **einmal täglich automatisch** und jederzeit per „Jetzt prüfen“ nach der neuesten Version auf GitHub sehen. Gibt es eine, zeigt die App einen Punkt an *Mehr* (im Hintergrund eine Benachrichtigung) – und **„Herunterladen und installieren“** spielt sie ein: APK aus dem Release laden, Prüfsumme prüfen, Android fragt noch einmal nach, fertig. Tägliche Prüfung abschaltbar |
 
 **Geräte** → Rechner mit Agent: **Shell** (Linux als Dienstkonto `rimperio`), **PowerShell**
 (Windows), **RDP** (öffnet die RDP-App des Handys) und „RDP einschalten“.
@@ -46,10 +47,21 @@ Unter **Mehr** liegen die Bereiche:
 | **Verbindung** | immer zuerst HTTPS; `http://` nur nach Warnung, danach dauerhaft rot markiert |
 | **Benachrichtigungen** | Berechtigung wird nach der Anmeldung erfragt; Abfrage im Vordergrund jede Minute, im Hintergrund (Android) etwa alle 15 min – mit eigenem Geräteschlüssel, der nicht nach 24 h abläuft. Gemeldet wird alles, was der Server unter *Meldungen → 📱* auswählt (Freigaben, Fehlschläge, Rechner offline, Checks, volle Platte, kritische Logzeilen …) |
 | **Gespeichert (verschlüsselt)** | Server-Adresse, Sitzungs-Token; das Passwort nur bei eingeschalteter Biometrie |
-| **Technik** | Flutter / Dart, `http`, `flutter_secure_storage`, `local_auth`, `mobile_scanner`, `flutter_local_notifications`, `workmanager`, `url_launcher` (RDP) |
+| **Technik** | Flutter / Dart, `http`, `flutter_secure_storage`, `local_auth`, `mobile_scanner`, `flutter_local_notifications`, `workmanager`, `url_launcher` (RDP), `package_info_plus` (App-Update) |
 
 > **QR-Code zeigt `http://`?** Dann ist am Server keine `SITE_URL` gesetzt. Die App
 > probiert trotzdem zuerst HTTPS. Dauerhaft beheben: `SITE_URL=https://…` am Server setzen.
+
+> **App-Update per Knopfdruck** gibt es nur für die **APK aus dem GitHub-Release**
+> (Android). Beim ersten Mal fragt Android, ob RIMPERIO Apps installieren darf
+> („Aus dieser Quelle zulassen“). Aus dem **Play Store** installiert, kommen Updates
+> über Google Play – die App prüft dann nicht selbst. Unter iOS zeigt sie nur die
+> Version und verweist aufs Release.
+>
+> **Einmalig nötig:** Bis 2026.11.23 waren die APKs mit wechselnden Debug-Schlüsseln
+> signiert. Wer so eine Version hat, deinstalliert die App einmal und installiert die
+> neue APK – ab dann sind alle APKs mit demselben Schlüssel signiert und das Update
+> per Knopfdruck klappt.
 
 > **Benachrichtigungen:** Der Server hat (noch) keinen Push-Dienst. Die App fragt deshalb
 > selbst nach – mit einem Geräteschlüssel, der nur Meldungen abholen darf und nicht nach
@@ -62,7 +74,7 @@ Unter **Mehr** liegen die Bereiche:
 
 - **Release:** APK und AAB hängen am [neuesten Release](https://github.com/Phydran6/RIMPERIO-App/releases/latest).
   Releases entstehen **vollautomatisch**: Bei jedem Push auf `main`, der etwas an der
-  App ändert (`lib/`, `assets/`, `pubspec.yaml`, `scripts/setup_platforms.sh`),
+  App ändert (`lib/`, `assets/`, `pubspec.yaml`, `scripts/setup_platforms.sh`, `scripts/android/`, `scripts/self_update_permission.sh`),
   vergibt die CI Version und Versionscode selbst und legt das Release an. Reine
   Doku-/CI-Änderungen lösen keins aus; *Actions → CI → Run workflow* erzwingt eins.
 
@@ -77,7 +89,7 @@ Unter **Mehr** liegen die Bereiche:
 
 | Datei | Signiert mit | Wofür |
 |---|---|---|
-| `RIMPERIO-<Version>.apk` | Debug-Schlüssel von Flutter | direkt aufs Handy installieren |
+| `RIMPERIO-<Version>.apk` | Upload-Schlüssel (immer derselbe) | direkt aufs Handy installieren; danach Updates per Knopfdruck (*Mehr → App-Update*) |
 | `RIMPERIO-<Version>-<Code>.aab` | Upload-Schlüssel | [Google Play Store](#google-play-store) |
 
 ---
@@ -87,8 +99,8 @@ Unter **Mehr** liegen die Bereiche:
 Dieses Repo enthält die Quelle (`lib/`, `pubspec.yaml`, `assets/`). Die
 plattform-spezifischen Ordner (`android/`, `ios/`) erzeugt ein Skript, das sie
 auch gleich fertig einrichtet — App-Name **RIMPERIO**, Berechtigungen (Internet,
-Kamera, Benachrichtigungen, Biometrie), FragmentActivity, Desugaring, iOS-Texte im
-Release, App-Symbol:
+Kamera, Benachrichtigungen, Biometrie, Selbst-Update), MainActivity, Desugaring,
+iOS-Texte im Release, App-Symbol:
 
 ```bash
 git clone https://github.com/Phydran6/RIMPERIO-App && cd RIMPERIO-App
@@ -98,6 +110,10 @@ bash scripts/setup_platforms.sh   # unter Windows in der Git Bash
 flutter run            # auf angeschlossenem Gerät/Emulator
 flutter build apk      # Release-APK
 ```
+
+> **Für den Play Store** (eigenes AAB) das Selbst-Update weglassen:
+> `RIMPERIO_SELF_UPDATE=0 bash scripts/setup_platforms.sh` – Google Play erlaubt
+> keine Apps, die sich an Play vorbei aktualisieren. Die CI macht das von selbst.
 
 > **HTTP-Server im LAN:** Android blockiert unverschlüsseltes HTTP ab Werk. Spricht
 > dein Server nur `http://`, das Skript mit `RIMPERIO_CLEARTEXT=1 bash scripts/setup_platforms.sh`
@@ -156,9 +172,12 @@ Neues Logo? Die drei Dateien ersetzen und `dart run flutter_launcher_icons` ausf
 | [`lib/core/biometrics.dart`](lib/core/biometrics.dart) | Fingerabdruck / Face ID |
 | [`lib/core/notifications.dart`](lib/core/notifications.dart) | Berechtigung, Abfrage, System-Benachrichtigungen |
 | [`lib/core/storage.dart`](lib/core/storage.dart) | verschlüsselte Ablage |
+| [`lib/core/app_update.dart`](lib/core/app_update.dart) | App-Update: GitHub fragen, Versionen vergleichen, tägliche Prüfung, Download und Übergabe an Android |
 | [`lib/screens/`](lib/screens/) | Einrichtung, QR-Scan, Anmeldung, Sperre, Übersicht, Logs (Bereich, Ansehen/Suchen), Geräte, Meldungen, Updates, DB-Updates, Proxmox, Server, Konsole/RDP, SNMP, Mehr |
 | [`lib/ui/`](lib/ui/) | Farben, gemeinsame Bausteine |
 | [`scripts/setup_platforms.sh`](scripts/setup_platforms.sh) | erzeugt und konfiguriert `android/` und `ios/` |
+| [`scripts/android/MainActivity.kt`](scripts/android/MainActivity.kt) | Vorlage der Android-Activity: Biometrie, Prüfsumme und Installation des App-Updates |
+| [`scripts/self_update_permission.sh`](scripts/self_update_permission.sh) | Selbst-Update-Berechtigung an (APK) / aus (Play-Store-AAB) |
 | [`scripts/create_upload_key.sh`](scripts/create_upload_key.sh) | Upload-Schlüssel + `key.properties` für den Play Store |
 | [`scripts/store/`](scripts/store/) | erzeugt die Store-Grafiken, macht persönliche Daten in Screenshots unkenntlich |
 | [`store/`](store/) | Store-Grafiken: Symbol, Vorstellungsgrafik, Screenshots |
@@ -166,7 +185,8 @@ Neues Logo? Die drei Dateien ersetzen und `dart run flutter_launcher_icons` ausf
 | [`docs/DATENSCHUTZ.md`](docs/DATENSCHUTZ.md) | Datenschutzerklärung (URL für die Play Console) |
 | [`test/widget_test.dart`](test/widget_test.dart) | Tests: Adressen, QR-Code, Token-Ablauf, Einrichtung |
 | [`test/pages_test.dart`](test/pages_test.dart) | Tests gegen einen simulierten Server: Logs ansehen/suchen, Log-Bereich, Installieren, DB-Updates |
-| [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | CI: Analyse, Tests, APK, AAB, iOS-Build; Version automatisch, Release bei App-Änderung auf `main` |
+| [`test/app_update_test.dart`](test/app_update_test.dart) | Tests App-Update: Versionen, Release lesen, tägliche Prüfung, Seite |
+| [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | CI: Analyse, Tests, AAB (ohne Selbst-Update), APK (mit), iOS-Build; Version automatisch, Release bei App-Änderung auf `main` |
 
 ---
 

@@ -1,9 +1,11 @@
 # Datenschutzerklärung
 
-**RIMPERIO** (Android/iOS-App) · Stand: 23. November 2026
+**RIMPERIO** (Android/iOS-App) · Stand: 24. November 2026
 
 Diese Erklärung beschreibt, welche Daten die App verarbeitet. Sie ist kurz,
-weil die App mit niemandem außer **deinem eigenen Server** spricht.
+weil die App mit niemandem außer **deinem eigenen Server** spricht – und, um
+nach einer neuen App-Version zu sehen, mit **GitHub** (abschaltbar, siehe
+[App-Update](#app-update-github)).
 
 ---
 
@@ -48,6 +50,8 @@ in Richtung deines eigenen Servers, wie unten beschrieben:
 - Einstellungen: Biometrie an/aus, Benachrichtigungen an/aus, die Kennung der
   zuletzt angezeigten Meldung, ob du eine unverschlüsselte `http://`-Verbindung
   ausdrücklich bestätigt hast
+- App-Update: tägliche Prüfung an/aus, Zeitpunkt der letzten Prüfung, die
+  zuletzt gesehene Version auf GitHub
 
 **Abmelden** löscht das Sitzungs-Token. **Deinstallieren** löscht alle Daten der
 App vom Gerät.
@@ -79,12 +83,33 @@ richtet sich nach dessen Betreiber.
 
 ---
 
+## App-Update (GitHub)
+
+Wie der Server sieht auch die App nach, ob es eine neue Version gibt:
+**einmal am Tag** (beim Öffnen bzw. in der Hintergrundabfrage) und wenn du
+unter *Mehr → App-Update* auf „Jetzt prüfen“ tippst.
+
+| Wann | Was |
+|:--|:--|
+| Prüfen | eine Anfrage an die öffentliche GitHub-API (`api.github.com`, Liste der Releases von `Phydran6/RIMPERIO-App`) – ohne Anmeldung, ohne Kennung, ohne Daten von dir oder deinem Server |
+| Installieren (nur auf deinen Knopfdruck) | Download der APK aus dem GitHub-Release; die App prüft die Prüfsumme, Android fragt vor dem Einspielen selbst noch einmal nach |
+
+GitHub (GitHub, Inc., USA) sieht dabei – wie bei jedem Abruf einer Webseite –
+die IP-Adresse des Geräts; siehe die
+[Datenschutzerklärung von GitHub](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement).
+Die tägliche Prüfung lässt sich unter *Mehr → App-Update* abschalten. Aus dem
+**Play Store** installiert, prüft die App nicht von selbst – Updates kommen dann
+über Google Play.
+
+---
+
 ## Was die App *nicht* tut
 
 - **Keine Werbung.** Keine Werbekennung, keine Werbenetzwerke
 - **Kein Tracking.** Kein Analyse-Werkzeug, keine Nutzungsstatistik, keine
   Absturzberichte an Dritte
 - **Keine Verbindung zu uns.** Die App kennt keinen Server des Entwicklers
+  (die Update-Prüfung fragt nur die öffentliche Release-Liste bei GitHub ab)
 - **Kein Standort, keine Kontakte, keine Fotos.** Die App fragt nicht danach
 - **Kein Verkauf von Daten.** An niemanden, zu keinem Preis
 
@@ -100,6 +125,7 @@ richtet sich nach dessen Betreiber.
 | **Benachrichtigungen** | Meldungen deines Servers als System-Benachrichtigung anzeigen. Abschaltbar |
 | **Nach dem Neustart starten** | Damit die Hintergrund-Abfrage der Meldungen (Android) nach einem Neustart weiterläuft |
 | **Andere Apps öffnen (RDP)** | Nur, um eine installierte RDP-App für die Verbindung zu einem Windows-Rechner zu starten |
+| **Apps installieren** (nur die APK aus dem GitHub-Release, nicht die Play-Store-Ausgabe) | Nur, um auf deinen Knopfdruck das Update der App selbst einzuspielen. Android fragt dafür einmal nach der Freigabe und vor jedem Update noch einmal |
 
 ---
 

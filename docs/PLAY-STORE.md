@@ -18,8 +18,8 @@ automatischen Build bis zu den Antworten in der Play Console.
 Push auf main ──► CI (GitHub Actions)
                    ├─ Version + Versionscode automatisch vergeben
                    ├─ analysieren, testen
-                   ├─ APK bauen (Debug-Schlüssel, zum direkten Installieren)
-                   ├─ AAB bauen (Upload-Schlüssel aus den Secrets) ──► Play Store
+                   ├─ AAB bauen (Upload-Schlüssel, ohne Selbst-Update) ──► Play Store
+                   ├─ APK bauen (Upload-Schlüssel, mit Selbst-Update) ──► direkt aufs Handy
                    └─ App geändert? ──► GitHub-Release mit APK + AAB
 ```
 
@@ -71,7 +71,28 @@ GitHub-Secrets gehört.
 | `ANDROID_KEY_ALIAS` | `upload` |
 
 Fehlen die Secrets (z. B. bei Pull Requests aus Forks), baut die CI nur die
-APK und überspringt die AAB.
+APK (dann mit dem Debug-Schlüssel) und überspringt die AAB.
+
+### Selbst-Update nur in der APK
+
+Die APK aus dem Release aktualisiert sich per Knopfdruck selbst
+(*Mehr → App-Update*). Dafür braucht sie `REQUEST_INSTALL_PACKAGES` – und die
+darf **nicht** ins Play-Store-Bundle: Google Play verbietet Apps, sich an Play
+vorbei zu aktualisieren. Die CI baut deshalb erst das AAB ohne die Berechtigung
+(`RIMPERIO_SELF_UPDATE=0 bash scripts/setup_platforms.sh`, die CI bricht ab,
+falls sie doch drinsteht) und schaltet sie erst danach für die APK an
+(`bash scripts/self_update_permission.sh on`). Die App merkt zur Laufzeit,
+ob sie die Berechtigung hat; aus dem Play Store installiert, verweist sie nur
+auf Google Play.
+
+**Eigenes AAB lokal bauen?** Dann `RIMPERIO_SELF_UPDATE=0` beim Setup setzen –
+Vorgabe ist *an*.
+
+Die APK ist mit dem **Upload-Schlüssel** signiert, nicht mehr mit dem
+Debug-Schlüssel: Der Debug-Schlüssel war auf jedem CI-Rechner ein anderer,
+Android lehnt dann das Drüberinstallieren ab. Wer noch eine ältere,
+Debug-signierte APK hat, deinstalliert **einmal** und installiert die neue
+APK – danach klappen Updates per Knopfdruck.
 
 ### Wie die Signatur in den Build kommt
 
@@ -102,7 +123,8 @@ In `pubspec.yaml` muss **nichts** geändert werden. Die CI
 **Wann ein Release entsteht:** bei einem Push auf `main`, wenn sich seit dem
 letzten Release etwas an der App geändert hat:
 
-- `lib/`, `assets/`, `pubspec.yaml`, `scripts/setup_platforms.sh`
+- `lib/`, `assets/`, `pubspec.yaml`, `scripts/setup_platforms.sh`,
+  `scripts/android/`, `scripts/self_update_permission.sh`
 
 Reine Doku-, CI- oder Store-Grafik-Änderungen lösen **kein** Release aus.
 Von Hand erzwingen: *Actions → CI → Run workflow* (auf `main`).
@@ -112,11 +134,12 @@ Das Release (Tag `v<Version>`) enthält:
 | Datei | Wofür |
 |:--|:--|
 | `RIMPERIO-<Version>-<Code>.aab` | Play Console |
-| `RIMPERIO-<Version>.apk` | direkt aufs Handy installieren (Debug-signiert) |
+| `RIMPERIO-<Version>.apk` | direkt aufs Handy installieren (Upload-Schlüssel, mit Selbst-Update) |
 
 Im Protokoll des Schritts *Play-Store-Bundle (AAB) bauen* steht der
 Fingerabdruck der AAB – er muss zum Upload-Schlüssel in der Play Console
-passen.
+passen. Der Schritt *Release-APK bauen* zeigt den Fingerabdruck der APK – er
+muss von Release zu Release gleich bleiben.
 
 > Die `version:` in `pubspec.yaml` gilt nur noch für lokale Builds.
 > Ändert sich der Name der Workflow-Datei, beginnt die Laufnummer neu – dann

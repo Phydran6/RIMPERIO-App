@@ -2,7 +2,7 @@
 // Datei:        lib/core/notifications.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.23.06.00.00
+// Version:      2026.11.24.12.00.00
 //
 // Beschreibung: Benachrichtigungen. Der Server kennt keinen Push-Dienst — die
 //               App fragt deshalb neue Meldungen ab, mit dem Geräteschlüssel
@@ -13,6 +13,9 @@
 //                   das ist das kürzeste, was Android erlaubt.
 //               Neue Meldungen erscheinen als System-Benachrichtigung.
 //               Die Berechtigung (Android 13+, iOS) wird einmal abgefragt.
+//               Die Hintergrundabfrage prüft außerdem einmal am Tag, ob es
+//               eine neue App-Version auf GitHub gibt (lib/core/app_update.dart),
+//               und meldet sie einmal je Version.
 // ---------------------------------------------------------------------------
 import 'dart:io';
 
@@ -21,11 +24,14 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:workmanager/workmanager.dart';
 
 import 'api.dart';
+import 'app_update.dart';
 import 'server_address.dart';
 import 'storage.dart';
 
 const _taskName = 'rimperio.poll';
 const _channelId = 'rimperio_alerts';
+const _updateChannelId = 'rimperio_app_update';
+const _updateNotificationId = 0x52494D; // fest: neue Version ersetzt die alte Meldung
 
 final _plugin = FlutterLocalNotificationsPlugin();
 bool _initialized = false;
@@ -39,6 +45,11 @@ void notificationDispatcher() {
       await Notifications.poll(background: true);
     } catch (e) {
       debugPrint('Hintergrundabfrage fehlgeschlagen: $e');
+    }
+    try {
+      await Notifications.checkAppUpdate();
+    } catch (e) {
+      debugPrint('App-Update-Prüfung fehlgeschlagen: $e');
     }
     return true; // Nie "Fehler" melden — sonst stapelt Android Wiederholungen.
   });
@@ -179,6 +190,30 @@ class Notifications {
       } catch (_) {}
     }
     await Storage.setDevice(null, null);
+  }
+
+  /// Tägliche Prüfung auf eine neue App-Version; meldet jede Version einmal.
+  static Future<void> checkAppUpdate() async {
+    if (!await Storage.getNotify()) return;
+    final r = await AppUpdate.autoCheck();
+    if (r == null) return;
+    await init();
+    await _plugin.show(
+      id: _updateNotificationId,
+      title: 'RIMPERIO-App ${r.version} ist da',
+      body: 'Mehr → App-Update: per Knopfdruck installieren.',
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          _updateChannelId,
+          'App-Updates',
+          channelDescription: 'Neue Version der RIMPERIO-App auf GitHub',
+          importance: Importance.defaultImportance,
+          priority: Priority.defaultPriority,
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+    );
+    await AppUpdate.markNotified(r);
   }
 
   static Future<void> _show(Map<String, dynamic> n) async {

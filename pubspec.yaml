@@ -2,7 +2,7 @@
 # Datei:        pubspec.yaml
 # Projekt:      RIMPERIO-App
 # Autor:        Phydran6
-# Version:      2026.11.23.06.00.00
+# Version:      2026.11.24.12.00.00
 # Beschreibung: Flutter-App — native App für den eigenen RIMPERIO-Server.
 # ---------------------------------------------------------------------------
 name: rimperio_app
@@ -26,6 +26,7 @@ dependencies:
   workmanager: ^0.10.10
   intl: ^0.20.3
   url_launcher: ^6.3.1
+  package_info_plus: ^9.0.1
 
 dev_dependencies:
   flutter_test:

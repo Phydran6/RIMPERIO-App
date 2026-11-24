@@ -2,7 +2,7 @@
 // Datei:        lib/core/storage.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.23.06.00.00
+// Version:      2026.11.24.12.00.00
 //
 // Beschreibung: Verschlüsselte Ablage auf dem Gerät (Android Keystore bzw.
 //               iOS Keychain): Server-Adresse, Sitzungs-Token und — nur wenn
@@ -74,6 +74,11 @@ class Storage {
   /// Einmal-Hinweise („Biometrie anbieten“, „Benachrichtigungen erfragen“).
   static Future<bool> getFlag(String name) async => (await _s.read(key: 'flag_$name')) == '1';
   static Future<void> setFlag(String name) => _s.write(key: 'flag_$name', value: '1');
+
+  /// Einfache Werte (App-Update: letzte Prüfung, gemerktes Release …).
+  static Future<String?> getValue(String name) => _s.read(key: 'val_$name');
+  static Future<void> setValue(String name, String? value) =>
+      value == null ? _s.delete(key: 'val_$name') : _s.write(key: 'val_$name', value: value);
 
   /// Abmelden: Sitzung und gespeicherte Zugangsdaten weg, Server bleibt.
   static Future<void> clearSession() async {

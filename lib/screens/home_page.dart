@@ -2,24 +2,27 @@
 // Datei:        lib/screens/home_page.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.23.06.00.00
+// Version:      2026.11.24.12.00.00
 //
 // Beschreibung: Gerüst der App mit unterer Navigationsleiste (Übersicht,
 //               Geräte, Meldungen, Mehr). Logs sind ein eigener Bereich unter
 //               „Mehr“; die Kacheln der Übersicht führen weiter direkt hin. Nach der ersten
 //               Anmeldung fragt es einmal nach Biometrie und nach der
 //               Benachrichtigungs-Berechtigung. Im Vordergrund holt es jede
-//               Minute neue Meldungen.
+//               Minute neue Meldungen. Einmal am Tag sieht es nach, ob es
+//               eine neue App-Version gibt (Punkt an „Mehr“, Hinweis unten).
 // ---------------------------------------------------------------------------
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../core/app_update.dart';
 import '../core/biometrics.dart';
 import '../core/notifications.dart';
 import '../core/storage.dart';
 import '../ui/scope.dart';
 import '../ui/widgets.dart';
+import 'app_update_page.dart';
 import 'dashboard_page.dart';
 import 'devices_page.dart';
 import 'inbox_page.dart';
@@ -40,15 +43,45 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _onboarding());
-    _poll = Timer.periodic(const Duration(minutes: 1), (_) => _pollNow());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _onboarding();
+      await AppUpdate.cleanup();
+      await _appUpdateCheck();
+    });
+    AppUpdate.available.addListener(_onUpdateChanged);
+    _poll = Timer.periodic(const Duration(minutes: 1), (_) {
+      _pollNow();
+      _appUpdateCheck(); // nur alle 24 h wirklich bei GitHub
+    });
     _pollNow();
   }
 
   @override
   void dispose() {
     _poll?.cancel();
+    AppUpdate.available.removeListener(_onUpdateChanged);
     super.dispose();
+  }
+
+  void _onUpdateChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// Tägliche Prüfung auf eine neue App-Version; meldet jede Version einmal.
+  Future<void> _appUpdateCheck() async {
+    try {
+      final r = await AppUpdate.autoCheck();
+      if (r == null || !mounted) return;
+      await AppUpdate.markNotified(r);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Neue App-Version ${r.version} verfügbar.'),
+        duration: const Duration(seconds: 8),
+        action: SnackBarAction(label: 'Ansehen', onPressed: () => AppUpdatePage.open(context)),
+      ));
+    } catch (_) {
+      // still — die Seite „App-Update“ zeigt Fehler selbst
+    }
   }
 
   Future<void> _pollNow() async {
@@ -161,7 +194,10 @@ class _HomePageState extends State<HomePage> {
                 isLabelVisible: _unread > 0, label: Text('$_unread'), child: const Icon(Icons.notifications)),
             label: 'Meldungen',
           ),
-          const NavigationDestination(icon: Icon(Icons.menu_rounded), label: 'Mehr'),
+          NavigationDestination(
+            icon: Badge(isLabelVisible: AppUpdate.available.value != null, child: const Icon(Icons.menu_rounded)),
+            label: 'Mehr',
+          ),
         ],
       ),
     );
