@@ -2,12 +2,12 @@
 // Datei:        test/pages_test.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.23.06.00.00
+// Version:      2026.11.24.21.00.00
 //
 // Beschreibung: Die neuen Bereiche gegen einen simulierten Server: Logs
 //               ansehen (ohne Info/Hinweis, Filter ohne „ab“), Logs suchen
 //               (mit Info/Hinweis), Log-Bereich, Installieren-Reiter,
-//               DB-Updates, Mehr-Seite. Prüft vor allem, dass nichts abstürzt
+//               DB-Updates, Proxmox (Patch-Lauf, Zeitplan). Prüft vor allem, dass nichts abstürzt
 //               oder überläuft und die richtigen Anfragen rausgehen.
 // ---------------------------------------------------------------------------
 import 'dart:convert';
@@ -23,6 +23,7 @@ import 'package:rimperio_app/screens/db_updates_page.dart';
 import 'package:rimperio_app/screens/log_hub_page.dart';
 import 'package:rimperio_app/screens/logs_page.dart';
 import 'package:rimperio_app/screens/patches_page.dart';
+import 'package:rimperio_app/screens/pve_page.dart';
 import 'package:rimperio_app/ui/scope.dart';
 import 'package:rimperio_app/ui/theme.dart';
 
@@ -47,7 +48,12 @@ Object? _route(http.Request r) {
   switch (p) {
     case '/api/app/logs':
       return {
-        'items': [_log(1, 'critical', 'Arbeitsspeicher voll – Prozess java wurde beendet'), _log(2, 'warning', 'SSH-Anmeldung fehlgeschlagen')],
+        // Die Info-Zeile schickt hier ein Server, der exclude_low nicht kennt.
+        'items': [
+          _log(1, 'critical', 'Arbeitsspeicher voll – Prozess java wurde beendet'),
+          _log(2, 'warning', 'SSH-Anmeldung fehlgeschlagen'),
+          _log(3, 'info', 'Dienst gestartet'),
+        ],
         'has_more': false,
         'next_before_id': null,
         'newest_id': 2,
@@ -79,6 +85,27 @@ Object? _route(http.Request r) {
         ],
         'totals': {'hosts': 1, 'installable': 2, 'needs_approval': 1, 'reviewing': 0},
       };
+    case '/api/pve/updates':
+      return {'hosts': [], 'jobs': [], 'total': 0};
+    case '/api/patching/pve/hosts':
+      return [];
+    case '/api/pve/patching':
+      return {
+        'hosts': [
+          {
+            'host_id': 7, 'host': 'pve-cluster', 'window_open': false, 'next_window': '2026-11-28T02:00:00Z',
+            'running': null,
+            'config': {'enabled': true, 'days': [5], 'start': '03:00', 'duration_minutes': 240,
+                       'reboot': 'kernel', 'refresh': true, 'only_security': false, 'timezone': 'Europe/Berlin'},
+          },
+        ],
+        'runs': [],
+        'history': [
+          {'id': 'abc', 'host': 'pve-cluster', 'status': 'succeeded', 'started_at': '2026-11-21T02:00:00Z',
+           'trigger': 'schedule', 'nodes': []},
+        ],
+        'reboot_modes': ['never', 'kernel', 'always'],
+      };
     case '/api/app/patching/approvals':
       return {'items': []};
     case '/api/app/patching/runs':
@@ -109,7 +136,10 @@ Session _session() {
   s.api = Api(s.server!, token: 'x', client: client);
   s.bootstrap = {
     'server': {
-      'capabilities': ['log-handling', 'patch-installable', 'db-updates', 'patch-approvals', 'remote-console'],
+      'capabilities': [
+        'log-handling', 'patch-installable', 'db-updates', 'patch-approvals', 'remote-console',
+        'pve-updates', 'pve-patching',
+      ],
       'version': 'test',
     },
     'user': {'username': 'admin', 'is_admin': true, 'role': 'admin'},
@@ -137,6 +167,7 @@ void main() {
     expect(find.text('Hinweis'), findsNothing);
     expect(find.textContaining('ab '), findsNothing);
     expect(find.text('×12'), findsOneWidget);
+    expect(find.text('Dienst gestartet'), findsNothing); // Info nie beim Ansehen
     final q = requests.firstWhere((u) => u.path == '/api/app/logs').queryParameters;
     expect(q['exclude_low'], 'true');
 
@@ -152,6 +183,7 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text('Info'), findsOneWidget);
     expect(find.text('Hinweis'), findsOneWidget);
+    expect(find.text('Dienst gestartet'), findsOneWidget); // in der Suche schon
     await t.tap(find.text('Info'));
     await t.pumpAndSettle();
     final q = requests.lastWhere((u) => u.path == '/api/app/logs').queryParameters;
@@ -177,6 +209,33 @@ void main() {
     expect(find.text('Alle installieren (2)'), findsOneWidget);
     expect(find.text('Installieren (2)'), findsOneWidget);
     expect(find.text('DB mit Probelauf'), findsOneWidget);
+    expect(find.text('Freigeben (1)'), findsOneWidget); // Freigabe direkt hier
+  });
+
+  testWidgets('Installieren aus „Geräte“: nur dieser Rechner', (t) async {
+    await t.pumpWidget(_wrap(_session(), const PatchesPage(initialTab: 1, agentUid: 'anders', host: 'db02')));
+    await t.pumpAndSettle();
+    expect(find.text('Updates · db02'), findsOneWidget);
+    expect(find.text('web01'), findsNothing);
+  });
+
+  testWidgets('Proxmox: Patch-Lauf mit Zeitplan und Verlauf', (t) async {
+    t.view.physicalSize = const Size(1080, 2800);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(_wrap(_session(), const PvePage()));
+    await t.pumpAndSettle();
+    expect(find.text('Patch-Lauf'), findsOneWidget);
+    await t.tap(find.text('Patch-Lauf'));
+    await t.pumpAndSettle();
+    expect(find.text('pve-cluster'), findsWidgets);
+    expect(find.text('Alle Knoten patchen'), findsOneWidget);
+    expect(find.textContaining('Zeitplan an: Sa ab 03:00'), findsOneWidget);
+    expect(find.text('pve-cluster · erfolgreich'), findsOneWidget);
+    await t.tap(find.text('Zeitplan'));
+    await t.pumpAndSettle();
+    expect(find.text('Zeitplan pve-cluster'), findsOneWidget);
+    expect(find.text('Speichern'), findsOneWidget);
   });
 
   testWidgets('DB-Updates: Vorgang und Container', (t) async {

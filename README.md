@@ -32,7 +32,7 @@ Unter **Mehr** liegen die Bereiche:
 | **Logs** | eigener Bereich: *Ansehen* (nur Warnung, Fehler, Kritisch – ohne Info/Hinweis), *Suchen* (alle Stufen inkl. Info/Hinweis, Text, Gerät, Zeitraum), *Themenbereiche*, *Rauschen & Sperren*, *Sperrregeln*, *Aufbewahrung*. Jede Zeile im Klartext mit Hinweis, „Diese Meldung sperren“, „KI erklärt“. Die Kacheln der Übersicht führen weiter direkt in die Logs |
 | **Updates & Freigaben** | Freigeben/ablehnen (KI-Einschätzung), **Installieren**: alle offenen Updates je Rechner und Container, freigegebene sofort einspielen (ein Lauf mit Snapshot, Prüfung, Rückweg), Läufe mit Verlauf, Zurückrollen |
 | **DB-Updates** | Datenbank-Container mit Sicherung und Probelauf prüfen, Bericht lesen, freigeben |
-| **Proxmox** | Updates der Knoten installieren, Neustart, Shell auf dem Knoten, Konsole von Containern/VMs, Agent per `pct exec` in Container |
+| **Proxmox** | Updates der Knoten installieren, Neustart, **„Alle Knoten patchen“** (rollierend, Knoten für Knoten mit Neustart nie/bei Kernel/immer) und **Zeitplan im Wartungsfenster** samt Verlauf, Shell auf dem Knoten, Konsole von Containern/VMs, Agent per `pct exec` in Container |
 | **RIMPERIO-Server** | Version, Update starten, Protokoll mitlesen |
 | **SNMP** | Geräte und Probleme |
 | **App-Update** | wie beim Server: **einmal täglich automatisch** und jederzeit per „Jetzt prüfen“ nach der neuesten Version auf GitHub sehen. Gibt es eine, zeigt die App einen Punkt an *Mehr* (im Hintergrund eine Benachrichtigung) – und **„Herunterladen und installieren“** spielt sie ein: APK aus dem Release laden, Prüfsumme prüfen, Android fragt noch einmal nach, fertig. Tägliche Prüfung abschaltbar |
@@ -45,7 +45,7 @@ Unter **Mehr** liegen die Bereiche:
 | **Anmeldung** | QR-Code aus der Weboberfläche (*Benutzer → App verbinden*) oder Benutzer/Passwort, mit Zweitfaktor |
 | **Biometrie** | Fingerabdruck / Face ID entsperrt die App; nach Passwort-Anmeldung meldet sie nach Ablauf der 24-h-Sitzung still neu an |
 | **Verbindung** | immer zuerst HTTPS; `http://` nur nach Warnung, danach dauerhaft rot markiert |
-| **Benachrichtigungen** | Berechtigung wird nach der Anmeldung erfragt; Abfrage im Vordergrund jede Minute, im Hintergrund (Android) etwa alle 15 min – mit eigenem Geräteschlüssel, der nicht nach 24 h abläuft. Gemeldet wird alles, was der Server unter *Meldungen → 📱* auswählt (Freigaben, Fehlschläge, Rechner offline, Checks, volle Platte, kritische Logzeilen …) |
+| **Benachrichtigungen** | Berechtigung wird nach der Anmeldung erfragt; Abfrage im Vordergrund jede Minute, im Hintergrund (Android) etwa alle 15 min – mit eigenem Geräteschlüssel, der nicht nach 24 h abläuft. Gemeldet wird alles, was der Server unter *Meldungen → 📱* auswählt (Freigaben, Fehlschläge, Rechner offline, Checks, volle Platte, kritische Logzeilen …). *Mehr → Benachrichtigung testen* prüft Anzeige und Abfrage beim Server |
 | **Gespeichert (verschlüsselt)** | Server-Adresse, Sitzungs-Token; das Passwort nur bei eingeschalteter Biometrie |
 | **Technik** | Flutter / Dart, `http`, `flutter_secure_storage`, `local_auth`, `mobile_scanner`, `flutter_local_notifications`, `workmanager`, `url_launcher` (RDP), `package_info_plus` (App-Update) |
 

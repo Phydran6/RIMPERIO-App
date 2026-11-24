@@ -2,7 +2,7 @@
 // Datei:        lib/screens/patches_page.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.23.06.00.00
+// Version:      2026.11.24.21.00.00
 //
 // Beschreibung: Patchmanagement unterwegs — offene Freigaben samt
 //               KI-Einschätzung freigeben/ablehnen/zurückstellen; alle
@@ -21,10 +21,15 @@ import '../ui/widgets.dart';
 
 class PatchesPage extends StatelessWidget {
   final int initialTab;
-  const PatchesPage({super.key, this.initialTab = 0});
 
-  static Future<void> open(BuildContext context, {int initialTab = 0}) => Navigator.of(context)
-      .push(MaterialPageRoute(builder: (_) => PatchesPage(initialTab: initialTab)));
+  /// Nur diesen Rechner zeigen (aus „Geräte“ heraus).
+  final String? agentUid;
+  final String? host;
+  const PatchesPage({super.key, this.initialTab = 0, this.agentUid, this.host});
+
+  static Future<void> open(BuildContext context, {int initialTab = 0, String? agentUid, String? host}) =>
+      Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => PatchesPage(initialTab: initialTab, agentUid: agentUid, host: host)));
 
   @override
   Widget build(BuildContext context) {
@@ -34,14 +39,18 @@ class PatchesPage extends StatelessWidget {
       initialIndex: installable ? initialTab : (initialTab == 2 ? 1 : initialTab.clamp(0, 1)),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Updates'),
+          title: Text(host == null ? 'Updates' : 'Updates · $host'),
           bottom: TabBar(tabs: [
             const Tab(text: 'Freigaben'),
             if (installable) const Tab(text: 'Installieren'),
             const Tab(text: 'Läufe'),
           ]),
         ),
-        body: TabBarView(children: [const _Approvals(), if (installable) const _Install(), const _Runs()]),
+        body: TabBarView(children: [
+          const _Approvals(),
+          if (installable) _Install(agentUid: agentUid),
+          const _Runs(),
+        ]),
       ),
     );
   }
@@ -378,7 +387,8 @@ class _RunIcon extends StatelessWidget {
 // Installieren: alles Offene je Rechner, freigegebene sofort einspielen
 // ---------------------------------------------------------------------------
 class _Install extends StatefulWidget {
-  const _Install();
+  final String? agentUid;
+  const _Install({this.agentUid});
   @override
   State<_Install> createState() => _InstallState();
 }
@@ -411,6 +421,24 @@ class _InstallState extends State<_Install> {
       HapticFeedback.mediumImpact();
       if (!mounted) return;
       showInfo(context, r['id'] == null ? '${r['message'] ?? 'DB-Update gestartet.'}' : 'Lauf #${r['id']} gestartet.');
+      await _key.currentState?.reload();
+    } catch (e) {
+      if (mounted) showError(context, e);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Offene Freigaben direkt hier erledigen – ohne Umweg über den Reiter.
+  Future<void> _approve(List<int> ids) async {
+    if (ids.isEmpty) return;
+    setState(() => _busy = true);
+    try {
+      final r = await context.session.api!
+          .postJson('/api/app/patching/decide', {'ids': ids, 'decision': 'approve', 'defer_days': 7});
+      HapticFeedback.mediumImpact();
+      if (!mounted) return;
+      showInfo(context, '${r['changed'] ?? ids.length} Update(s) freigegeben – jetzt installierbar.');
       await _key.currentState?.reload();
     } catch (e) {
       if (mounted) showError(context, e);
@@ -457,7 +485,10 @@ class _InstallState extends State<_Install> {
       key: _key,
       load: () => s.api!.getJson('/api/app/patching/open'),
       builder: (context, d, reload) {
-        final hosts = (d['hosts'] as List).cast<Map<String, dynamic>>();
+        final hosts = (d['hosts'] as List)
+            .cast<Map<String, dynamic>>()
+            .where((h) => widget.agentUid == null || h['agent_uid'] == widget.agentUid)
+            .toList();
         final totals = (d['totals'] as Map).cast<String, dynamic>();
         final cs = context.cs;
         return Column(children: [
@@ -510,6 +541,7 @@ class _InstallState extends State<_Install> {
     final items = (h['items'] as List).cast<Map<String, dynamic>>();
     final run = h['active_run'] as Map?;
     final installable = (h['installable'] as int?) ?? 0;
+    final pending = items.where((i) => i['status'] == 'needs_approval').map((i) => i['id'] as int).toList();
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       child: Card(
@@ -540,12 +572,17 @@ class _InstallState extends State<_Install> {
                   if (it['reboot'] == true) Pill('Neustart', color: cs.outline),
                   if (it['to'] != null) Text('→ ${it['to']}', style: TextStyle(color: cs.outline, fontSize: 12)),
                 ]),
-                trailing: s.isAdmin && it['installable'] == true && run == null && it['kind'] == 'docker'
+                trailing: s.isAdmin && it['status'] == 'needs_approval'
                     ? IconButton(
-                        tooltip: 'Nur diesen Container',
-                        icon: const Icon(Icons.play_circle_outline_rounded),
-                        onPressed: _busy ? null : () => _installHost(h, only: [it['id'] as int]))
-                    : null,
+                        tooltip: 'Freigeben',
+                        icon: const Icon(Icons.check_circle_outline_rounded),
+                        onPressed: _busy ? null : () => _approve([it['id'] as int]))
+                    : s.isAdmin && it['installable'] == true && run == null && it['kind'] == 'docker'
+                        ? IconButton(
+                            tooltip: 'Nur diesen Container',
+                            icon: const Icon(Icons.play_circle_outline_rounded),
+                            onPressed: _busy ? null : () => _installHost(h, only: [it['id'] as int]))
+                        : null,
               ),
             if (s.isAdmin)
               Padding(
@@ -553,6 +590,15 @@ class _InstallState extends State<_Install> {
                 child: Row(children: [
                   TextButton(onPressed: () => _scan(h['agent_uid'] as String?), child: const Text('Jetzt suchen')),
                   const Spacer(),
+                  if (pending.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(minimumSize: const Size(0, 40)),
+                        onPressed: _busy ? null : () => _approve(pending),
+                        child: Text('Freigeben (${pending.length})'),
+                      ),
+                    ),
                   FilledButton(
                     style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
                     onPressed: _busy || installable == 0 || run != null ? null : () => _installHost(h),
