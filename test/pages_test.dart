@@ -107,7 +107,19 @@ Object? _route(http.Request r) {
         'reboot_modes': ['never', 'kernel', 'always'],
       };
     case '/api/app/patching/approvals':
-      return {'items': []};
+      return {
+        'items': [
+          {'id': 7, 'host': 'web01', 'agent_uid': 'u1', 'kind': 'os', 'platform': 'linux',
+           'title': 'openssh-server', 'from': '9.6p1-3', 'to': '9.6p1-4', 'security': true, 'urgent': true,
+           'reboot': false, 'status': 'needs_approval', 'tier': 'critical', 'tier_label': 'Kritisch',
+           'urgency': 'immediate', 'urgency_label': 'sofort', 'escalated': false,
+           'reason': 'Regel „Anmeldung / Zugang“ · Kritisch: nie ohne Freigabe', 'ai': null, 'advisories': []},
+          {'id': 8, 'host': 'web02', 'agent_uid': 'u2', 'kind': 'os', 'platform': 'linux',
+           'title': 'htop', 'security': false, 'urgent': false, 'reboot': false, 'status': 'needs_approval',
+           'tier': 'important', 'tier_label': 'Wichtig', 'urgency': 'low', 'urgency_label': 'irgendwann',
+           'escalated': true, 'reason': 'hochgestuft', 'ai': null, 'advisories': []},
+        ],
+      };
     case '/api/app/patching/runs':
       return {'items': []};
     case '/api/db-updates':
@@ -210,6 +222,20 @@ void main() {
     expect(find.text('Installieren (2)'), findsOneWidget);
     expect(find.text('DB mit Probelauf'), findsOneWidget);
     expect(find.text('Freigeben (1)'), findsOneWidget); // Freigabe direkt hier
+  });
+
+  testWidgets('Freigaben: Stufe und Dringlichkeit', (t) async {
+    await t.pumpWidget(_wrap(_session(), const PatchesPage()));
+    await t.pumpAndSettle();
+    expect(find.text('openssh-server'), findsOneWidget);
+    expect(find.text('Kritisch'), findsOneWidget);
+    expect(find.text('sofort'), findsOneWidget);
+    expect(find.text('Wichtig ↑'), findsOneWidget); // hochgestuft
+    expect(find.text('irgendwann'), findsOneWidget);
+    await t.tap(find.text('openssh-server'));
+    await t.pumpAndSettle();
+    expect(find.textContaining('nie ohne Freigabe installiert'), findsOneWidget);
+    expect(find.textContaining('nicht erst im Wartungsfenster'), findsOneWidget);
   });
 
   testWidgets('Installieren aus „Geräte“: nur dieser Rechner', (t) async {

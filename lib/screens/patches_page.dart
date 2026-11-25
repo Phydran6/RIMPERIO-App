@@ -2,10 +2,12 @@
 // Datei:        lib/screens/patches_page.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.24.21.00.00
+// Version:      2026.11.25.22.00.00
 //
 // Beschreibung: Patchmanagement unterwegs — offene Freigaben samt
-//               KI-Einschätzung freigeben/ablehnen/zurückstellen; alle
+//               KI-Einschätzung, Stufe (Normal/Wichtig/Kritisch) und
+//               Dringlichkeit (sofort/zeitnah/irgendwann)
+//               freigeben/ablehnen/zurückstellen; alle
 //               offenen Updates je Rechner und Container sehen und die
 //               freigegebenen sofort installieren (ein Lauf je Rechner mit
 //               Snapshot, Vorher/Nachher, Neustart und Prüfung); Läufe
@@ -195,7 +197,8 @@ class _PatchTile extends StatelessWidget {
         padding: const EdgeInsets.only(top: 4),
         child: Wrap(spacing: 6, runSpacing: 4, children: [
           Text('${item['host'] ?? ''}', style: TextStyle(color: cs.onSurfaceVariant, fontWeight: FontWeight.w600)),
-          if (item['urgent'] == true) const Pill('dringend', color: Color(0xFFE5484D)),
+          ...TierPills.of(item),
+          if (item['urgent'] == true) const Pill('KEV', color: Color(0xFFE5484D)),
           if (item['security'] == true) const Pill('Sicherheit', color: Color(0xFFF5A524), icon: Icons.shield),
           if (item['reboot'] == true) Pill('Neustart', color: cs.outline, icon: Icons.restart_alt),
           if (risk != null) Pill('KI: ${_riskLabel(risk)}', color: _riskColor(risk)),
@@ -226,6 +229,17 @@ class _PatchTile extends StatelessWidget {
             if (item['from'] != null || item['to'] != null) '${item['from'] ?? '?'} → ${item['to'] ?? '?'}',
             item['platform'],
           ].whereType<Object>().join(' · '), style: TextStyle(color: ctx.cs.onSurfaceVariant)),
+          if (item['tier'] != null || item['urgency'] != null) ...[
+            const SizedBox(height: 12),
+            Wrap(spacing: 6, runSpacing: 4, children: TierPills.of(item)),
+            const SizedBox(height: 6),
+            Text(TierPills.explain(item), style: TextStyle(color: ctx.cs.onSurfaceVariant)),
+          ],
+          if (item['db_migration_id'] != null) ...[
+            const SizedBox(height: 8),
+            Text('Sicherung und Probelauf: DB-Update #${item['db_migration_id']} (Mehr → DB-Updates).',
+                style: TextStyle(color: ctx.cs.tertiary)),
+          ],
           if (item['reason'] != null) ...[
             const SizedBox(height: 12),
             Text('${item['reason']}'),
@@ -279,6 +293,48 @@ class _PatchTile extends StatelessWidget {
         'high' => const Color(0xFFE5484D),
         _ => RimTheme.gold,
       };
+}
+
+/// Stufe (wie viel Mensch) und Dringlichkeit (wie schnell) eines Updates.
+/// Ältere Server liefern beides nicht – dann bleibt es leer.
+class TierPills {
+  static const _red = Color(0xFFE5484D);
+  static const _amber = Color(0xFFF5A524);
+  static const _grey = Color(0xFF8B8D98);
+  static const _blue = Color(0xFF3E63DD);
+
+  static List<Widget> of(Map item) {
+    final tier = item['tier'] as String?;
+    final urgency = item['urgency'] as String?;
+    return [
+      if (tier != null && tier.isNotEmpty)
+        Pill('${item['tier_label'] ?? tier}${item['escalated'] == true ? ' ↑' : ''}',
+            color: switch (tier) { 'critical' => _red, 'important' => _amber, _ => _grey },
+            icon: tier == 'critical' ? Icons.gpp_maybe_rounded : null),
+      if (urgency != null && urgency.isNotEmpty)
+        Pill('${item['urgency_label'] ?? urgency}',
+            color: switch (urgency) { 'immediate' => _red, 'soon' => _blue, _ => _grey },
+            icon: urgency == 'immediate' ? Icons.bolt_rounded : null),
+    ];
+  }
+
+  static String explain(Map item) {
+    final tier = switch (item['tier']) {
+      'critical' => 'Kritisch: wird nie ohne Freigabe installiert.',
+      'important' => item['escalated'] == true
+          ? 'Eigentlich normal, wegen eines erkannten Risikos auf „Wichtig“ hochgestuft.'
+          : 'Wichtig: läuft von selbst – Freigabe nur, weil es Fehler auslösen könnte.',
+      'normal' => 'Normal: läuft von selbst.',
+      _ => null,
+    };
+    final urgency = switch (item['urgency']) {
+      'immediate' => 'Sofort: wird nach der Freigabe direkt installiert, nicht erst im Wartungsfenster.',
+      'soon' => 'Zeitnah: im nächsten Wartungsfenster.',
+      'low' => 'Irgendwann: nach einer Rückstellung im Wartungsfenster.',
+      _ => null,
+    };
+    return [tier, urgency].whereType<String>().join(' ');
+  }
 }
 
 class _Runs extends StatelessWidget {
@@ -566,8 +622,9 @@ class _InstallState extends State<_Install> {
                 title: Text('${it['title']}', maxLines: 2, overflow: TextOverflow.ellipsis),
                 subtitle: Wrap(spacing: 6, runSpacing: 4, children: [
                   Pill('${it['status_label']}', color: _statusColor(it['status'] as String?, cs)),
+                  ...TierPills.of(it),
                   if (it['security'] == true) const Pill('Sicherheit', color: Color(0xFFF5A524), icon: Icons.shield),
-                  if (it['urgent'] == true) const Pill('dringend', color: Color(0xFFE5484D)),
+                  if (it['urgent'] == true) const Pill('KEV', color: Color(0xFFE5484D)),
                   if (it['db'] == true) Pill('DB mit Probelauf', color: cs.tertiary),
                   if (it['reboot'] == true) Pill('Neustart', color: cs.outline),
                   if (it['to'] != null) Text('→ ${it['to']}', style: TextStyle(color: cs.outline, fontSize: 12)),
