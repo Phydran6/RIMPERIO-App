@@ -30,7 +30,7 @@ Unter **Mehr** liegen die Bereiche:
 | Bereich | Was |
 |---|---|
 | **Logs** | eigener Bereich: *Ansehen* (nur Warnung, Fehler, Kritisch – ohne Info/Hinweis), *Suchen* (alle Stufen inkl. Info/Hinweis, Text, Gerät, Zeitraum), *Themenbereiche*, *Rauschen & Sperren*, *Sperrregeln*, *Aufbewahrung*. Jede Zeile im Klartext mit Hinweis, „Diese Meldung sperren“, „KI erklärt“. Die Kacheln der Übersicht führen weiter direkt in die Logs |
-| **Updates & Freigaben** | Freigeben/ablehnen (KI-Einschätzung), **Installieren**: alle offenen Updates je Rechner und Container, freigegebene sofort einspielen (ein Lauf mit Snapshot, Prüfung, Rückweg), Läufe mit Verlauf, Zurückrollen |
+| **Updates & Freigaben** | Freigeben/ablehnen (KI-Einschätzung), je Update **Stufe** (Normal / Wichtig / Kritisch) und **Dringlichkeit** (sofort / zeitnah / irgendwann) – Sofortiges und Kritisches steht oben, der Startbildschirm färbt sich rot, wenn etwas sofort freigegeben werden muss. **Installieren**: alle offenen Updates je Rechner und Container, freigegebene sofort einspielen (ein Lauf mit Snapshot, Prüfung, Rückweg), Läufe mit Verlauf, Zurückrollen |
 | **DB-Updates** | Datenbank-Container mit Sicherung und Probelauf prüfen, Bericht lesen, freigeben |
 | **Proxmox** | Updates der Knoten installieren, Neustart, **„Alle Knoten patchen“** (rollierend, Knoten für Knoten mit Neustart nie/bei Kernel/immer) und **Zeitplan im Wartungsfenster** samt Verlauf, Shell auf dem Knoten, Konsole von Containern/VMs, Agent per `pct exec` in Container |
 | **RIMPERIO-Server** | Version, Update starten, Protokoll mitlesen |

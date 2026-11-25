@@ -2,7 +2,7 @@
 // Datei:        lib/screens/dashboard_page.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.23.06.00.00
+// Version:      2026.11.25.22.00.00
 //
 // Beschreibung: Startbildschirm — Logs heute, Probleme, Geräte, offene
 //               Freigaben und die Verteilung nach Schweregrad.
@@ -44,6 +44,8 @@ class DashboardPage extends StatelessWidget {
         final problems = sum['problems_today'] as int? ?? 0;
         final offline = dev['offline'] as int? ?? 0;
         final approvals = patch?['needs_approval'] as int? ?? 0;
+        final approvalsNow = patch?['needs_approval_immediate'] as int? ?? 0;
+        final approvalsCritical = patch?['needs_approval_critical'] as int? ?? 0;
         final failedRuns = patch?['runs_failed_7d'] as int? ?? 0;
 
         return RefreshIndicator(
@@ -93,9 +95,17 @@ class DashboardPage extends StatelessWidget {
                   if (hasPatches)
                     StatTile(
                       icon: Icons.system_update_alt_rounded,
-                      label: 'Updates freigeben',
+                      label: approvalsNow > 0
+                          ? 'Updates freigeben · $approvalsNow sofort'
+                          : approvalsCritical > 0
+                              ? 'Updates freigeben · $approvalsCritical kritisch'
+                              : 'Updates freigeben',
                       value: fmtInt(approvals),
-                      color: approvals > 0 ? RimTheme.gold : const Color(0xFF30A46C),
+                      color: approvalsNow > 0
+                          ? const Color(0xFFF2555A)
+                          : approvals > 0
+                              ? RimTheme.gold
+                              : const Color(0xFF30A46C),
                       onTap: () => PatchesPage.open(context),
                     )
                   else
