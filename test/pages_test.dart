@@ -2,12 +2,12 @@
 // Datei:        test/pages_test.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.24.21.00.00
+// Version:      2026.11.26.22.00.00
 //
 // Beschreibung: Die neuen Bereiche gegen einen simulierten Server: Logs
 //               ansehen (ohne Info/Hinweis, Filter ohne „ab“), Logs suchen
 //               (mit Info/Hinweis), Log-Bereich, Installieren-Reiter,
-//               DB-Updates, Proxmox (Patch-Lauf, Zeitplan). Prüft vor allem, dass nichts abstürzt
+//               DB-Updates, Proxmox (Patch-Lauf, Zeitplan), NAS, Backup. Prüft vor allem, dass nichts abstürzt
 //               oder überläuft und die richtigen Anfragen rausgehen.
 // ---------------------------------------------------------------------------
 import 'dart:convert';
@@ -19,9 +19,11 @@ import 'package:http/testing.dart';
 import 'package:rimperio_app/core/api.dart';
 import 'package:rimperio_app/core/server_address.dart';
 import 'package:rimperio_app/core/session.dart';
+import 'package:rimperio_app/screens/backups_page.dart';
 import 'package:rimperio_app/screens/db_updates_page.dart';
 import 'package:rimperio_app/screens/log_hub_page.dart';
 import 'package:rimperio_app/screens/logs_page.dart';
+import 'package:rimperio_app/screens/nas_page.dart';
 import 'package:rimperio_app/screens/patches_page.dart';
 import 'package:rimperio_app/screens/pve_page.dart';
 import 'package:rimperio_app/ui/scope.dart';
@@ -133,6 +135,55 @@ Object? _route(http.Request r) {
            'status_label': 'wartet auf Freigabe', 'old_version': '16.4', 'new_version': '17.2', 'can_approve': true},
         ],
       };
+    case '/api/nas':
+      return [
+        {'id': 1, 'name': 'DS920+', 'vendor_label': 'Synology DSM', 'status': 'warning', 'model': 'DS920+',
+         'firmware': 'DSM 7.2.1-69057 Update 5', 'last_ok_at': '2026-11-26T19:58:21Z', 'temperature': 41,
+         'updates_summary': {'dsm': 'DSM 7.2.2-72806', 'packages': 1, 'checked_at': '2026-11-26T19:58:21Z'},
+         'volumes': [{'name': '/volume1', 'percent': 85.7, 'status': 'normal'}],
+         'problems': [{'level': 'warning', 'what': 'volfull:v1', 'text': 'Volume /volume1 zu 86 % belegt'}]},
+      ];
+    case '/api/nas/1':
+      return {
+        'id': 1, 'name': 'DS920+', 'vendor_label': 'Synology DSM', 'status': 'warning', 'url': 'https://10.0.0.5:5001',
+        'busy': false, 'snmp_device_id': 3, 'last_error': null,
+        'problems': [{'level': 'warning', 'what': 'volfull:v1', 'text': 'Volume /volume1 zu 86 % belegt'}],
+        'state': {
+          'system': {'model': 'DS920+', 'firmware': 'DSM 7.2.1-69057 Update 5', 'temperature': 41, 'uptime': '10:00:00'},
+          'load': {'cpu': 9, 'mem': 37},
+          'volumes': [{'name': '/volume1', 'status': 'normal', 'percent': 85.7, 'used': 3e12, 'total': 3.5e12}],
+          'disks': [{'name': 'Laufwerk 1', 'model': 'WD40EFRX', 'status': 'normal', 'smart': 'normal', 'temp': 34, 'size': 4e12}],
+          'backup_tasks': [{'id': 3, 'name': 'USB-Sicherung', 'last_time': '2026/11/25 02:00', 'last_result': 'done'}],
+        },
+        'updates': {
+          'checked_at': '2026-11-26T19:58:21Z',
+          'dsm': {'available': true, 'version': 'DSM 7.2.2-72806'},
+          'packages': [{'id': 'Docker', 'name': 'Container Manager', 'installed': '20.10.23-1437', 'available': '24.0.2-1535'}],
+        },
+        'jobs': [
+          {'id': 2, 'kind': 'package_update', 'status': 'done', 'started_at': '2026-11-26T19:58:30Z', 'error': null,
+           'log': [{'at': '2026-11-26T19:58:30Z', 'text': 'Docker: ok'}]},
+        ],
+      };
+    case '/api/backups/overview':
+      return {'jobs': 2, 'enabled': 2, 'ok': 1, 'failed': 1, 'overdue': 0, 'targets': 1, 'stored_bytes': 20480,
+              'key': {'name': 'Backup-Schlüssel', 'backend': 'vaultwarden'}, 'vault_active': true};
+    case '/api/backups/jobs':
+      return [
+        {'id': 1, 'name': 'RIMPERIO täglich', 'kind': 'rimperio', 'kind_label': 'RIMPERIO-Server', 'source_label': 'Bereiche: Standard',
+         'target': {'id': 1, 'name': 'NAS SMB', 'kind': 'smb'}, 'encrypt': true, 'overdue': false, 'running': false,
+         'next_run_at': '2026-11-27T01:30:00Z',
+         'last_run': {'status': 'done', 'started_at': '2026-11-26T19:54:40Z', 'size_bytes': 8776, 'error': null}},
+        {'id': 2, 'name': 'Pi Ordner', 'kind': 'files', 'kind_label': 'Ordner auf einem Rechner', 'source_label': 'pi: /etc',
+         'target': {'id': 1, 'name': 'NAS SMB', 'kind': 'smb'}, 'encrypt': true, 'overdue': true, 'running': false,
+         'next_run_at': null, 'last_run': {'status': 'error', 'started_at': '2026-11-26T19:54:40Z', 'error': 'Rechner offline'}},
+      ];
+    case '/api/backups/runs':
+      return [
+        {'id': 5, 'job_name': 'RIMPERIO täglich', 'status': 'done', 'started_at': '2026-11-26T19:54:40Z', 'size_bytes': 8776,
+         'location': r'\\10.0.0.5\Backup\rimperio\x.zip.rimpbak', 'file_name': 'x.zip.rimpbak', 'detail': {'target_id': 1},
+         'log': [{'text': 'Abgelegt'}], 'error': null},
+      ];
   }
   return {'detail': 'unbekannt'};
 }
@@ -150,7 +201,7 @@ Session _session() {
     'server': {
       'capabilities': [
         'log-handling', 'patch-installable', 'db-updates', 'patch-approvals', 'remote-console',
-        'pve-updates', 'pve-patching',
+        'pve-updates', 'pve-patching', 'nas', 'backup-jobs',
       ],
       'version': 'test',
     },
@@ -270,5 +321,39 @@ void main() {
     expect(find.text('web01 / db-1'), findsOneWidget);
     expect(find.text('Update prüfen'), findsOneWidget);
     expect(find.text('Freigabe'), findsOneWidget);
+  });
+
+  testWidgets('NAS: Liste und Detail mit Updates', (t) async {
+    t.view.physicalSize = const Size(1080, 4000);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(_wrap(_session(), const NasPage()));
+    await t.pumpAndSettle();
+    expect(find.text('DS920+'), findsOneWidget);
+    expect(find.text('DSM DSM 7.2.2-72806'), findsOneWidget);
+    expect(find.text('1 Pakete'), findsOneWidget);
+    await t.tap(find.text('DS920+'));
+    await t.pumpAndSettle();
+    expect(find.text('Container Manager'), findsOneWidget);
+    expect(find.text('Installieren'), findsOneWidget);
+    expect(find.text('Alle 1 Pakete aktualisieren'), findsOneWidget);
+    expect(find.text('USB-Sicherung'), findsOneWidget);
+    expect(requests.any((u) => u.path == '/api/nas/1'), isTrue);
+  });
+
+  testWidgets('Backup: Aufträge und Verlauf', (t) async {
+    t.view.physicalSize = const Size(1080, 3200);
+    t.view.devicePixelRatio = 2.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(_wrap(_session(), const BackupsPage()));
+    await t.pumpAndSettle();
+    expect(find.text('RIMPERIO täglich'), findsOneWidget);
+    expect(find.text('Pi Ordner'), findsOneWidget);
+    expect(find.text('Rechner offline'), findsOneWidget);
+    expect(find.text('überfällig'), findsOneWidget);
+    await t.tap(find.byIcon(Icons.history_rounded));
+    await t.pumpAndSettle();
+    expect(find.text('Backup-Verlauf'), findsOneWidget);
+    expect(find.text('RIMPERIO täglich'), findsOneWidget);
   });
 }
