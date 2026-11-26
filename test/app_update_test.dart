@@ -2,7 +2,7 @@
 // Datei:        test/app_update_test.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.24.12.00.00
+// Version:      0.0.1
 //
 // Beschreibung: App-Update: Versionen lesen und vergleichen, Release von
 //               GitHub auswerten (APK, Prüfsumme, Versionscode), tägliche
@@ -73,6 +73,20 @@ void main() {
       expect(compareVersions('2026.11.3', '2026.11.23'), lessThan(0));
       expect(compareVersions('v2026.11.23', '2026.11.23'), 0);
       expect(compareVersions('2026.12.1', '2026.11.30'), greaterThan(0));
+    });
+
+    test('Semantic Versioning und Wechsel vom Datum', () {
+      expect(compareVersions('0.0.10', '0.0.9'), greaterThan(0));
+      expect(compareVersions('0.10.0', '0.9.9'), greaterThan(0));
+      expect(compareVersions('v1.0.0', '1.0.0'), 0);
+      // Jede SemVer-Version ist neuer als jeder alte Datumsname.
+      expect(compareVersions('0.0.1', '2026.11.25'), greaterThan(0));
+      expect(compareVersions('2026.11.25.3', '0.0.1'), lessThan(0));
+      expect(isLegacyVersion('2026.11.25'), isTrue);
+      expect(isLegacyVersion('0.0.1'), isFalse);
+      const app = InstalledApp(version: '2026.11.25', code: 150);
+      expect(isNewer(AppRelease(tag: 'v0.0.1', version: '0.0.1', code: 151, pageUrl: ''), app), isTrue);
+      expect(isNewer(AppRelease(tag: 'v0.0.1', version: '0.0.1', code: null, pageUrl: ''), app), isTrue);
     });
 
     test('Versionscode aus dem Release-Text', () {

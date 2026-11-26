@@ -2,7 +2,7 @@
 // Datei:        lib/core/app_update.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.24.12.00.00
+// Version:      0.0.1
 //
 // Beschreibung: App-Update aus dem GitHub-Release — wie beim Server:
 //                 * einmal täglich automatisch (beim Öffnen der App und in
@@ -11,7 +11,9 @@
 //               Gefragt wird die öffentliche GitHub-API
 //               (releases/latest, ohne Anmeldung, 60 Abfragen/h je IP).
 //               Verglichen wird der Versionscode aus dem Release-Text
-//               („Versionscode **142**“), sonst der Versionsname (Datum).
+//               („Versionscode **142**“), sonst der Versionsname
+//               (Semantic Versioning, ab 0.0.1; alte Datums-Namen wie
+//               2026.11.23 gelten als älter als jede SemVer-Version).
 //
 //               Installieren (nur Android, nur die APK aus dem Release):
 //               APK in den Cache laden, Prüfsumme (SHA-256 vom Release)
@@ -149,8 +151,17 @@ List<int> parseVersion(String v) => v
     .whereType<int>()
     .toList();
 
-/// <0: a älter, 0: gleich, >0: a neuer.
+/// Alter Versionsname im Datumsschema (2026.11.23, 2026.11.23.2)? Eine
+/// vierstellige Jahreszahl vorne ist nie ein SemVer-Major.
+bool isLegacyVersion(String v) {
+  final p = parseVersion(v);
+  return p.length >= 3 && p.first >= 1900 && p.first <= 2199;
+}
+
+/// <0: a älter, 0: gleich, >0: a neuer. Datumsnamen sind älter als SemVer.
 int compareVersions(String a, String b) {
+  final la = isLegacyVersion(a), lb = isLegacyVersion(b);
+  if (la != lb) return la ? -1 : 1;
   final x = parseVersion(a), y = parseVersion(b);
   for (var i = 0; i < x.length || i < y.length; i++) {
     final d = (i < x.length ? x[i] : 0) - (i < y.length ? y[i] : 0);
@@ -160,7 +171,7 @@ int compareVersions(String a, String b) {
 }
 
 /// Ist das Release neuer als die installierte App? Der Versionscode steigt
-/// mit jedem CI-Lauf — darauf ist Verlass; der Name (Datum) nur als Rückfall.
+/// mit jedem CI-Lauf — darauf ist Verlass; der Name nur als Rückfall.
 bool isNewer(AppRelease r, InstalledApp a) {
   if (r.code != null && a.code > 0) return r.code! > a.code;
   return compareVersions(r.version, a.version) > 0;

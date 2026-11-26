@@ -112,12 +112,13 @@ Keystore danach wieder.
 
 ## 2. Versionen und Releases (vollautomatisch)
 
-In `pubspec.yaml` muss **nichts** geändert werden. Die CI
-([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) vergibt selbst:
+Für Fehlerbehebungen muss in `pubspec.yaml` **nichts** geändert werden; für eine neue
+Funktion `MINOR` anheben (`version: 0.2.0+1`), für Inkompatibles `MAJOR`. Die CI
+([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) vergibt:
 
 | | Herkunft | Beispiel |
 |:--|:--|:--|
-| **Versionsname** | Datum (Europe/Berlin); am selben Tag `.2`, `.3` … | `2026.11.23` |
+| **Versionsname** | [Semantic Versioning](https://semver.org/lang/de/) `MAJOR.MINOR.PATCH` aus `pubspec.yaml`; gibt es das Release schon, zählt die CI `PATCH` hoch | `0.1.3` |
 | **Versionscode** | 100 + fortlaufende CI-Laufnummer – steigt immer | `142` |
 
 **Wann ein Release entsteht:** bei einem Push auf `main`, wenn sich seit dem
