@@ -27,6 +27,7 @@ class Storage {
   static const _kInsecureOk = 'insecure_confirmed_for';
   static const _kDeviceKey = 'device_key';
   static const _kDeviceId = 'device_id';
+  static const _kTenantScope = 'tenant_scope';
 
   static Future<String?> getUrl() => _s.read(key: _kUrl);
   static Future<void> setUrl(String url) => _s.write(key: _kUrl, value: url);
@@ -66,6 +67,11 @@ class Storage {
     }
   }
 
+  /// Mandanten-Ansicht eines Betreibers (leer = alle Mandanten).
+  static Future<String?> getTenantScope() => _s.read(key: _kTenantScope);
+  static Future<void> setTenantScope(String? v) =>
+      (v == null || v.isEmpty) ? _s.delete(key: _kTenantScope) : _s.write(key: _kTenantScope, value: v);
+
   /// Für welche http://-Adresse der Nutzer das Risiko bestätigt hat.
   static Future<String?> getInsecureConfirmed() => _s.read(key: _kInsecureOk);
   static Future<void> setInsecureConfirmed(String? url) =>
@@ -88,6 +94,7 @@ class Storage {
     await _s.delete(key: _kLastNotification);
     await _s.delete(key: _kDeviceKey);
     await _s.delete(key: _kDeviceId);
+    await _s.delete(key: _kTenantScope);
   }
 
   /// Server wechseln: alles weg.
