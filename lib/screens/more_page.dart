@@ -2,10 +2,10 @@
 // Datei:        lib/screens/more_page.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.24.12.00.00
+// Version:      2026.11.26.22.00.00
 //
 // Beschreibung: Weitere Bereiche und Einstellungen — Logs (eigener Bereich),
-//               Updates, Proxmox, DB-Updates, RIMPERIO-Server, SNMP,
+//               Updates, Proxmox, DB-Updates, NAS, Backup, RIMPERIO-Server, SNMP,
 //               Biometrie, Benachrichtigungen, App-Update, Verbindung,
 //               Abmelden.
 // ---------------------------------------------------------------------------
@@ -18,8 +18,10 @@ import '../core/storage.dart';
 import '../ui/scope.dart';
 import '../ui/widgets.dart';
 import 'app_update_page.dart';
+import 'backups_page.dart';
 import 'db_updates_page.dart';
 import 'log_hub_page.dart';
+import 'nas_page.dart';
 import 'patches_page.dart';
 import 'pve_page.dart';
 import 'server_page.dart';
@@ -184,6 +186,16 @@ class _MorePageState extends State<MorePage> {
             title: 'Proxmox',
             subtitle: 'Knoten-Updates, alle Knoten patchen, Zeitplan, Shell, Konsole',
             onTap: () => PvePage.open(context)),
+        _area(caps, 'nas',
+            icon: Icons.storage_rounded,
+            title: 'NAS',
+            subtitle: 'Synology & Co.: Zustand, Platten, DSM- und Paket-Updates',
+            onTap: () => NasPage.open(context)),
+        _area(caps, 'backup-jobs',
+            icon: Icons.backup_outlined,
+            title: 'Backup',
+            subtitle: 'Aufträge, jetzt sichern, Verlauf und Prüfen',
+            onTap: () => BackupsPage.open(context)),
         if (s.isAdmin)
           _area(caps, 'server-update',
               icon: Icons.rocket_launch_outlined,
