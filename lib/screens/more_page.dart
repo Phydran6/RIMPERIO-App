@@ -95,6 +95,41 @@ class _MorePageState extends State<MorePage> {
     }
   }
 
+  /// Betreiber: auf einen Mandanten umschalten (oder alle / nur Betreiber).
+  Future<void> _pickTenant() async {
+    final s = context.session;
+    final options = <MapEntry<String, String>>[
+      const MapEntry('', 'Alle Mandanten'),
+      const MapEntry('0', 'Nur Betreiber (ohne Mandant)'),
+      ...s.tenants.map((t) => MapEntry('${t['id']}', '${t['name']}')),
+    ];
+    final current = s.tenantScope ?? '';
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Mandant'),
+        children: [
+          for (final o in options)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, o.key),
+              child: Row(children: [
+                Icon(o.key == current ? Icons.radio_button_checked : Icons.radio_button_unchecked, size: 20),
+                const SizedBox(width: 12),
+                Expanded(child: Text(o.value)),
+              ]),
+            ),
+        ],
+      ),
+    );
+    if (picked == null || picked == current) return;
+    try {
+      await s.setTenantScope(picked);
+      if (mounted) showInfo(context, 'Ansicht: ${s.tenantScopeLabel}');
+    } catch (e) {
+      if (mounted) showError(context, '$e');
+    }
+  }
+
   /// Ein Bereich unter „Mehr“. Kann der Server ihn (noch) nicht, bleibt er
   /// trotzdem sichtbar — mit Hinweis aufs Server-Update statt unsichtbar.
   Widget _area(List<String> caps, String cap,
@@ -159,10 +194,22 @@ class _MorePageState extends State<MorePage> {
               subtitle: Text([
                 if (user?['role'] != null) user!['role'],
                 if (user?['mfa_enabled'] == true) 'MFA an',
+                if (s.ownTenantName != null) s.ownTenantName!,
               ].join(' · ')),
             ),
           ),
         ),
+        // Mandanten: Betreiber schalten die Ansicht um, Kunden sehen ihren Namen.
+        if (s.tenancyEnabled && s.isProvider) ...[
+          const SectionHeader('Mandant'),
+          ListTile(
+            leading: const Icon(Icons.apartment_rounded),
+            title: const Text('Ansicht'),
+            subtitle: Text(s.tenantScopeLabel),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: _pickTenant,
+          ),
+        ],
         const SectionHeader('Bereiche'),
         ListTile(
           leading: const Icon(Icons.receipt_long_rounded),
@@ -196,7 +243,7 @@ class _MorePageState extends State<MorePage> {
             title: 'Backup',
             subtitle: 'Aufträge, jetzt sichern, Verlauf und Prüfen',
             onTap: () => BackupsPage.open(context)),
-        if (s.isAdmin)
+        if (s.isAdmin && s.isProvider)
           _area(caps, 'server-update',
               icon: Icons.rocket_launch_outlined,
               title: 'RIMPERIO-Server',

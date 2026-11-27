@@ -45,6 +45,10 @@ class Api {
   final ServerAddress server;
   String? token;
 
+  /// Mandant, auf den ein Betreiber umgeschaltet hat (Kopf X-Rimperio-Tenant).
+  /// Null = alle. Bei Kunden-Konten ignoriert der Server den Kopf.
+  String? tenantScope;
+
   /// Wird aufgerufen, wenn der Server den Token ablehnt (abgelaufen/entzogen).
   void Function()? onUnauthorized;
 
@@ -56,6 +60,7 @@ class Api {
   Map<String, String> get _headers => {
         'Accept': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
+        if (tenantScope != null && tenantScope!.isNotEmpty) 'X-Rimperio-Tenant': tenantScope!,
       };
 
   // ---- Anmeldung ----------------------------------------------------------

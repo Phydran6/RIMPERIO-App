@@ -38,6 +38,37 @@ class Session extends ChangeNotifier {
   static const lockAfter = Duration(minutes: 2);
 
   bool get isAdmin => bootstrap?['user']?['is_admin'] == true;
+
+  // ---- Mandanten (Server mit Fähigkeit "tenants") -------------------------
+  Map<String, dynamic>? get _tenancy => bootstrap?['tenancy'] as Map<String, dynamic>?;
+  bool get tenancyEnabled => _tenancy?['enabled'] == true;
+
+  /// Betreiber = Konto ohne Mandant: sieht alles, kann umschalten.
+  bool get isProvider => _tenancy == null || _tenancy!['is_provider'] != false;
+
+  /// Name des eigenen Mandanten (Kunden-Konto), sonst null.
+  String? get ownTenantName => (_tenancy?['tenant'] as Map?)?['name'] as String?;
+
+  /// Wohin ein Betreiber umschalten kann: [{id, name, slug}].
+  List<Map<String, dynamic>> get tenants =>
+      ((_tenancy?['tenants'] as List?) ?? const []).cast<Map>().map((m) => m.cast<String, dynamic>()).toList();
+
+  /// Aktuelle Ansicht: null = alle, "0" = nur Betreiber, sonst Mandanten-ID.
+  String? get tenantScope => api?.tenantScope;
+
+  String get tenantScopeLabel {
+    final sc = tenantScope;
+    if (sc == null || sc.isEmpty) return 'Alle Mandanten';
+    if (sc == '0') return 'Nur Betreiber';
+    return tenants.firstWhere((t) => '${t['id']}' == sc, orElse: () => {'name': 'Mandant #$sc'})['name'] as String;
+  }
+
+  Future<void> setTenantScope(String? value) async {
+    final v = (value == null || value.isEmpty) ? null : value;
+    await Storage.setTenantScope(v);
+    api?.tenantScope = v;
+    await refreshBootstrap();
+  }
   String get serverName => bootstrap?['server']?['name'] as String? ?? 'RIMPERIO';
   bool get isSecure => server?.isSecure ?? false;
 
@@ -45,6 +76,8 @@ class Session extends ChangeNotifier {
     final url = await Storage.getUrl();
     if (url == null || url.isEmpty) return _go(Stage.setup);
     _useServer(ServerAddress.parse(url));
+    // Gemerkte Mandanten-Ansicht wieder aufnehmen (nur Betreiber nutzen sie).
+    api!.tenantScope = await Storage.getTenantScope();
     username = await Storage.getUsername();
     biometricEnabled = await Storage.getBiometric();
     hasStoredPassword = (await Storage.getPassword()) != null;
@@ -257,6 +290,13 @@ class Session extends ChangeNotifier {
       if (e.isUnauthorized) return; // _onUnauthorized hat schon umgeschaltet
       // Offline o. Ä.: trotzdem rein, die Seiten zeigen den Fehler selbst.
       debugPrint('Bootstrap fehlgeschlagen: $e');
+    }
+    // Gewählter Mandant gibt es nicht mehr oder Konto ist kein Betreiber:
+    // zurück auf "alle".
+    final sc = api?.tenantScope;
+    if (sc != null && sc != '0' && (!isProvider || !tenants.any((t) => '${t['id']}' == sc))) {
+      await Storage.setTenantScope(null);
+      api?.tenantScope = null;
     }
     _go(Stage.ready);
     if (hasCapability('device-push')) {
