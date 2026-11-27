@@ -82,10 +82,11 @@ Unter **Mehr** liegen die Bereiche:
 
   | | Herkunft | Beispiel |
   |---|---|---|
-  | Versionsname | Datum (Europe/Berlin), am selben Tag mit `.2`, `.3` … | `2026.11.23` |
+  | Versionsname | [Semantic Versioning](https://semver.org/lang/de/) `MAJOR.MINOR.PATCH` aus `pubspec.yaml`; gibt es das Release schon, zählt die CI `PATCH` hoch | `0.1.3` |
   | Versionscode | 100 + fortlaufende CI-Laufnummer — steigt immer | `142` |
 
-  Die `version:` in `pubspec.yaml` gilt nur noch für lokale Builds.
+  Fehlerbehebungen brauchen nichts in `pubspec.yaml`. Für eine neue Funktion `MINOR` anheben
+  (`version: 0.2.0+1`), für Inkompatibles `MAJOR`. Der `+Code` gilt nur für lokale Builds.
 - **Jeder Stand:** jeder [CI-Lauf](https://github.com/Phydran6/RIMPERIO-App/actions/workflows/ci.yml)
   hat 30 Tage lang die Artefakte `android-apk` und `android-aab` (Anmeldung bei GitHub nötig).
 

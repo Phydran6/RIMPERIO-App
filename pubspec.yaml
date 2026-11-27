@@ -2,13 +2,15 @@
 # Datei:        pubspec.yaml
 # Projekt:      RIMPERIO-App
 # Autor:        Phydran6
-# Version:      2026.11.24.12.00.00
+# Version:      0.0.1
 # Beschreibung: Flutter-App — native App für den eigenen RIMPERIO-Server.
 # ---------------------------------------------------------------------------
 name: rimperio_app
 description: "RIMPERIO — Remote Monitoring & Management vom Handy."
 publish_to: "none"
-version: 2026.11.23+5
+# Semantic Versioning: MAJOR.MINOR.PATCH (+Code nur für lokale Builds).
+# Die CI zählt PATCH selbst hoch; MINOR/MAJOR hier anheben.
+version: 0.0.1+1
 
 environment:
   sdk: ">=3.4.0 <4.0.0"

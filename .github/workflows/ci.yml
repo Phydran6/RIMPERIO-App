@@ -2,17 +2,21 @@
 # Datei:        .github/workflows/ci.yml
 # Projekt:      RIMPERIO-App
 # Autor:        Phydran6
-# Version:      2026.11.24.12.00.00
+# Version:      0.0.1
 # Beschreibung: Bei jedem Push/PR: Plattform-Ordner erzeugen, analysieren,
 #               testen, Android-APK, Play-Store-Bundle (AAB, nur mit
 #               Signatur-Secrets) und iOS (unsigniert) bauen.
 #
-#               Versionen vergibt die CI selbst — in pubspec.yaml muss
-#               nichts geändert werden:
-#                 Name  = Datum (Europe/Berlin), z. B. 2026.11.23;
-#                         gibt es den Tag schon: 2026.11.23.2, .3, …
+#               Versionen nach Semantic Versioning (MAJOR.MINOR.PATCH,
+#               https://semver.org/lang/de/), ab 0.0.1:
+#                 Name  = version: in pubspec.yaml (ohne +Code). Gibt es
+#                         das Tag v<Name> schon, zählt die CI PATCH hoch
+#                         (0.1.0 → 0.1.1 → …). Neue Funktion: MINOR in
+#                         pubspec.yaml anheben (0.2.0), Inkompatibles: MAJOR.
 #                 Code  = 100 + fortlaufende Laufnummer (steigt immer —
 #                         das verlangt der Play Store)
+#               Die alten Datums-Tags (v2026.11.25) gelten als älter als
+#               jede SemVer-Version.
 #
 #               Release (Tag v<Name>, APK + AAB) entsteht automatisch bei
 #               einem Push auf main, wenn sich seit dem letzten Release an
@@ -63,10 +67,25 @@ jobs:
           REF: ${{ github.ref }}
         run: |
           code=$((100 + RUN_NUMBER))
-          base=$(TZ=Europe/Berlin date +%Y.%-m.%-d)
-          name="$base"; n=1
+          # Grundversion aus pubspec.yaml ("version: 0.1.0+5" → 0.1.0).
+          base=$(sed -n -E 's/^version:[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+)(\+.*)?[[:space:]]*$/\1/p' pubspec.yaml)
+          if [ -z "$base" ] || [[ "$base" =~ ^(19|20|21)[0-9]{2}\. ]]; then
+            echo "::error::pubspec.yaml: version muss MAJOR.MINOR.PATCH sein (z. B. version: 0.1.0+1)."; exit 1
+          fi
+          # Höchstes SemVer-Release (alte Datums-Tags v2026.… zählen nicht).
+          highest=$(git tag -l 'v*' | sed 's/^v//' \
+            | grep -E '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' \
+            | grep -v -E '^(19|20|21)[0-9]{2}\.' | sort -V | tail -n1 || true)
+          # Liegt pubspec.yaml darunter (nicht angehoben), geht es beim
+          # höchsten Release weiter - sonst entstünde eine kleinere Version.
+          name="$base"
+          if [ -n "$highest" ] && [ "$(printf '%s\n%s\n' "$base" "$highest" | sort -V | tail -n1)" != "$base" ]; then
+            name="$highest"
+          fi
+          # Gibt es das Tag schon: PATCH hochzählen.
           while git rev-parse -q --verify "refs/tags/v${name}" >/dev/null; do
-            n=$((n + 1)); name="${base}.${n}"
+            IFS=. read -r ma mi pa <<< "$name"
+            name="${ma}.${mi}.$((pa + 1))"
           done
 
           release=false
