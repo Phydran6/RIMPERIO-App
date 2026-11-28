@@ -10,7 +10,7 @@ description: "RIMPERIO — Remote Monitoring & Management vom Handy."
 publish_to: "none"
 # Semantic Versioning: MAJOR.MINOR.PATCH (+Code nur für lokale Builds).
 # Die CI zählt PATCH selbst hoch; MINOR/MAJOR hier anheben.
-version: 0.2.0+1
+version: 0.2.1+1
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
