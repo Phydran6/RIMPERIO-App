@@ -9,7 +9,7 @@
 //               dem Wort UPDATE, das NAS startet neu); Vorgänge mit Protokoll.
 //               Quelle: /api/nas. Einrichten geht in der Weboberfläche.
 //               NAS an einem anderen Standort: der Weg über den Agent dort
-//               (via_agent, ab Server 0.3.0) steht an Liste und Detail.
+//               (via_agent, ab Server 0.4.0) steht an Liste und Detail.
 // ---------------------------------------------------------------------------
 import 'dart:async';
 
