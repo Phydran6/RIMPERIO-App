@@ -2,7 +2,7 @@
 // Datei:        lib/screens/server_page.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.23.06.00.00
+// Version:      0.2.0
 //
 // Beschreibung: RIMPERIO selbst aktualisieren — installierter und
 //               verfügbarer Stand, Update starten (vorher Sicherung) und das
@@ -38,6 +38,7 @@ class _ServerPageState extends State<ServerPage> {
   void initState() {
     super.initState();
     _load();
+    _loadAuto();
   }
 
   @override
@@ -57,6 +58,37 @@ class _ServerPageState extends State<ServerPage> {
       }
     } catch (e) {
       if (mounted) setState(() => _error = e);
+    }
+  }
+
+  Map<String, dynamic>? _auto;
+
+  Future<void> _loadAuto() async {
+    try {
+      final a = await context.session.api!.getJson('/api/app/server/autopilot');
+      if (mounted) setState(() => _auto = a);
+    } catch (_) {
+      // aelterer Server ohne Autopilot
+    }
+  }
+
+  Future<void> _decide(String decision) async {
+    final v = '${(_auto?['candidate'] as Map?)?['tag'] ?? ''}';
+    if (v.isEmpty) return;
+    if (decision == 'approve' &&
+        !await confirmDialog(context, 'RIMPERIO $v freigeben?',
+            'Das Update startet sofort – mit Sicherung vorher und automatischem Rückfall.', action: 'Freigeben')) {
+      return;
+    }
+    if (!mounted) return;
+    try {
+      await context.session.api!.postJson('/api/app/server/autopilot', {'version': v, 'decision': decision});
+      if (!mounted) return;
+      showInfo(context, decision == 'approve' ? 'Freigegeben – Update startet.' : 'Übersprungen.');
+      if (decision == 'approve') _follow();
+      await _loadAuto();
+    } catch (e) {
+      if (mounted) showError(context, e);
     }
   }
 
@@ -131,6 +163,34 @@ class _ServerPageState extends State<ServerPage> {
                 const SizedBox(height: 12),
                 Text('Letzter Vorgang: ${(st['run'] as Map)['status']} ${(st['run'] as Map)['message'] ?? ''}',
                     style: TextStyle(color: cs.outline, fontSize: 12)),
+              ],
+              if (_auto != null) ...[
+                const SectionHeader('Autopilot'),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(children: [
+                        Icon(_auto!['enabled'] == true ? Icons.autorenew_rounded : Icons.pause_circle_outline,
+                            color: _auto!['enabled'] == true ? const Color(0xFF30A46C) : cs.outline),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(_auto!['enabled'] == true ? 'RIMPERIO hält sich selbst aktuell' : 'Autopilot aus')),
+                      ]),
+                      const SizedBox(height: 6),
+                      Text('${_auto!['reason'] ?? ''}', style: TextStyle(color: cs.onSurfaceVariant)),
+                      if (_auto!['action'] == 'await_approval' && context.session.isAdmin) ...[
+                        const SizedBox(height: 8),
+                        Wrap(spacing: 8, children: [
+                          FilledButton.icon(
+                              onPressed: () => _decide('approve'),
+                              icon: const Icon(Icons.verified_user_outlined),
+                              label: const Text('Freigeben')),
+                          TextButton(onPressed: () => _decide('skip'), child: const Text('Überspringen')),
+                        ]),
+                      ],
+                    ]),
+                  ),
+                ),
               ],
               const SizedBox(height: 16),
               if (context.session.isAdmin)
