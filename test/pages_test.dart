@@ -142,6 +142,11 @@ Object? _route(http.Request r) {
          'updates_summary': {'dsm': 'DSM 7.2.2-72806', 'packages': 1, 'checked_at': '2026-11-26T19:58:21Z'},
          'volumes': [{'name': '/volume1', 'percent': 85.7, 'status': 'normal'}],
          'problems': [{'level': 'warning', 'what': 'volfull:v1', 'text': 'Volume /volume1 zu 86 % belegt'}]},
+        {'id': 2, 'name': 'DS224-Filiale', 'vendor_label': 'Synology DSM', 'status': 'ok', 'model': 'DS224+',
+         'firmware': 'DSM 7.2.2-72806', 'last_ok_at': '2026-11-26T19:58:21Z',
+         'updates_summary': {'dsm': null, 'packages': 0, 'checked_at': '2026-11-26T19:58:21Z'},
+         'volumes': [], 'problems': [], 'via_agent_id': 9,
+         'via_agent': {'id': 9, 'hostname': 'DS224-Filiale', 'site': 'Filiale', 'on_nas': true, 'ready': true}},
       ];
     case '/api/nas/1':
       return {
@@ -332,6 +337,7 @@ void main() {
     expect(find.text('DS920+'), findsOneWidget);
     expect(find.text('DSM DSM 7.2.2-72806'), findsOneWidget);
     expect(find.text('1 Pakete'), findsOneWidget);
+    expect(find.text('über Agent auf dem NAS · Filiale'), findsOneWidget);
     await t.tap(find.text('DS920+'));
     await t.pumpAndSettle();
     expect(find.text('Container Manager'), findsOneWidget);

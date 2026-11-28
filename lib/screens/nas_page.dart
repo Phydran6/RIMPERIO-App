@@ -2,12 +2,14 @@
 // Datei:        lib/screens/nas_page.dart
 // Projekt:      RIMPERIO-App
 // Autor:        Phydran6
-// Version:      2026.11.26.22.00.00
+// Version:      2026.11.27.21.00.00
 //
 // Beschreibung: NAS (Synology DSM, TrueNAS) per HTTPS — Zustand, Speicher,
 //               Platten, Probleme; DSM- und Paket-Updates anstoßen (DSM nur mit
 //               dem Wort UPDATE, das NAS startet neu); Vorgänge mit Protokoll.
 //               Quelle: /api/nas. Einrichten geht in der Weboberfläche.
+//               NAS an einem anderen Standort: der Weg über den Agent dort
+//               (via_agent, ab Server 0.3.0) steht an Liste und Detail.
 // ---------------------------------------------------------------------------
 import 'dart:async';
 
@@ -114,6 +116,10 @@ class _NasCard extends StatelessWidget {
                   if ((upd['packages'] ?? 0) as int > 0) Pill('${upd['packages']} Pakete', color: cs.primary),
                   if (n['temperature'] != null) Pill('${n['temperature']} °C', color: cs.outline),
                   Pill('gelesen ${relativeTime(n['last_ok_at'] as String?)}', color: cs.outline),
+                  if (n['via_agent'] is Map)
+                    Pill(_viaText(n['via_agent'] as Map),
+                        color: (n['via_agent'] as Map)['ready'] == true ? cs.primary : const Color(0xFFE5484D),
+                        icon: Icons.hub_rounded),
                 ]),
                 for (final v in vols) ...[
                   const SizedBox(height: 8),
@@ -260,7 +266,9 @@ class _NasDetailPageState extends State<NasDetailPage> {
               ListTile(
                 leading: SeverityDot(_statusLevel(d['status'] as String?)),
                 title: Text('${d['name']}', style: Theme.of(context).textTheme.titleLarge),
-                subtitle: Text('${sys['model'] ?? d['vendor_label']} · ${sys['firmware'] ?? '–'}\n${d['url']}'),
+                subtitle: Text('${sys['model'] ?? d['vendor_label']} · ${sys['firmware'] ?? '–'}\n${d['url']}'
+                    '${d['via_agent'] is Map ? '\n${_viaText(d['via_agent'] as Map)}'
+                        '${(d['via_agent'] as Map)['ready'] == true ? '' : ' – Agent nicht verbunden'}' : ''}'),
                 isThreeLine: true,
               ),
               if (d['last_error'] != null)
@@ -394,4 +402,11 @@ class _NasDetailPageState extends State<NasDetailPage> {
       ),
     );
   }
+}
+
+/// "über Agent pc-empfang" bzw. "über Agent auf dem NAS" – mit Standort.
+String _viaText(Map a) {
+  final who = a['on_nas'] == true ? 'Agent auf dem NAS' : 'Agent ${a['hostname'] ?? '?'}';
+  final site = '${a['site'] ?? ''}';
+  return 'über $who${site.isNotEmpty ? ' · $site' : ''}';
 }
